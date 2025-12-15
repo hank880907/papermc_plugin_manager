@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Optional, Dict
-from colorama import Fore, Style, init
 from datetime import datetime
 
 
@@ -35,26 +34,6 @@ class ProjectInfo:
     
     def __str__(self) -> str:
         return f"{self.name} by {self.author} (ID: {self.id})"
-    
-    def complete_description(self) -> str:
-        init(autoreset=True)
-        
-        # Calculate the longest label for alignment
-        labels = ["ID:", "Author:", "Downloads:", "Supported Versions:"]
-        max_label_len = max(len(label) for label in labels)
-        
-        lines = [
-            f"{Fore.GREEN}{Style.BRIGHT}{self.name}",
-            f"{Fore.YELLOW}{'ID:':<{max_label_len}} {Fore.WHITE}{self.id}",
-            f"{Fore.YELLOW}{'Author:':<{max_label_len}} {Fore.WHITE}{self.author}",
-            f"{Fore.YELLOW}{'Downloads:':<{max_label_len}} {Fore.WHITE}{self.downloads:,}",
-            f"{Fore.YELLOW}{'latest:':<{max_label_len}} {Fore.WHITE}{self.latest if self.latest else 'N/A'}",
-            f"{Fore.YELLOW}{'latest release:':<{max_label_len}} {Fore.WHITE}{self.latest_release if self.latest_release else 'N/A'}"
-        ]
-        if self.description:
-            lines.append(f"{Fore.YELLOW}Description:")
-            lines.append(f"{Fore.WHITE}{self.description}")
-        return "\n".join(lines)
     
 
 

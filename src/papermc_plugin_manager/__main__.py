@@ -8,6 +8,18 @@ from requests import HTTPError
 from .utils import get_papermc_version, get_sha1
 from .plugin_manager import PluginManager
 from .connector_interface import ProjectInfo, FileInfo
+from .console import (
+    console,
+    create_plugin_info_panel,
+    create_search_results_table,
+    create_version_table,
+    create_version_detail_panel,
+    create_installed_plugins_table,
+    print_success,
+    print_error,
+    print_warning,
+    print_info,
+)
 
 app = typer.Typer()
 
@@ -23,12 +35,12 @@ def search(
     game_version = cli_ctx.game_version
     result = connector.query(name, game_version)
     if not result:
-        typer.echo("No results found.")
+        print_warning("No results found.")
     else:
-        typer.echo(f"found {len(result)} results.")
-        for i, plugin_id in enumerate(result, start=1):
-            typer.echo(f"\n{i}: {plugin_id}")
-            typer.echo(f"{result[plugin_id].complete_description()}")
+        console.print(f"\n[bold green]Found {len(result)} results[/bold green]\n")
+        table = create_search_results_table(result)
+        console.print(table)
+        console.print()  # Add extra line for spacing
 
 
 @app.command()
@@ -45,31 +57,45 @@ def show(
     manager = PluginManager(connector, cli_ctx.game_version)
     result = manager.fuzzy_find_project(name)
     if not result:
-        typer.echo(f"Plugin {name} not found.")
+        print_error(f"Plugin {name} not found.")
         raise typer.Exit(code=1)
     is_exact_match, project = result
-    typer.echo(project.complete_description())
+    
+    # Display project info in a panel
+    panel = create_plugin_info_panel(
+        name=project.name,
+        id=project.id,
+        author=project.author,
+        downloads=project.downloads,
+        latest=project.latest,
+        latest_release=project.latest_release,
+        description=project.description,
+    )
+    console.print(panel)
+    console.print()
 
     if not version:
+        # Show available versions in a table
+        versions_data = []
         i = 0
-        for id, file in project.versions.items():
+        for version_id, file in project.versions.items():
             if not snapshot and file.version_type != "RELEASE":
                 continue
-            typer.echo(f"{id}: {file}")
+            versions_data.append((version_id, file))
             if i+1 >= limit:
                 break
             i += 1
+        
+        if versions_data:
+            table = create_version_table(versions_data, f"Available Versions (showing {len(versions_data)})")
+            console.print(table)
     else:
         if version in project.versions:
             file = project.versions[version]
-            typer.echo(f"{version}: {file}")
-            typer.echo(f"Minecraft Versions: {', '.join(file.mc_versions)}")
-            typer.echo(f"Release Type: {file.version_type}")
-            typer.echo(f"Download URL: {file.url}")
-            typer.echo(f"Hashes: {file.hashes}")
-            typer.echo(f"Release Date: {file.release_date}")
+            panel = create_version_detail_panel(version, file)
+            console.print(panel)
         else:
-            typer.echo(f"Version {version} not found for plugin {project.name}.")
+            print_error(f"Version {version} not found for plugin {project.name}.")
             raise typer.Exit(code=1)
 
 
@@ -77,8 +103,18 @@ def show(
 def server_info(ctx: typer.Context):
     """Display information about the current CLI context."""
     cli_ctx: CliContext = ctx.obj
+    
+    from rich.table import Table
+    table = Table(title="[bold cyan]Server Information[/bold cyan]", show_header=True, header_style="bold magenta")
+    table.add_column("Property", style="cyan", no_wrap=True)
+    table.add_column("Value", style="green")
+    
     for key, value in cli_ctx.__dict__.items():
-        typer.echo(f"{key}: {value}")
+        # Skip the connector object as it's not useful to display
+        if key != "connector":
+            table.add_row(key, str(value))
+    
+    console.print(table)
         
 @app.command()
 def install(
@@ -98,12 +134,13 @@ def install(
     result = manager.fuzzy_find_project(name)
 
     if not result:
-        typer.echo(f"Plugin {name} not found.")
+        print_error(f"Plugin {name} not found.")
         raise typer.Exit(code=1)
     
     is_exact_match, project = result
     if not is_exact_match and not yes:
-        typer.confirm(f"Do you want to install {project.name} (ID: {project.id})?", abort=True)
+        console.print(f"\n[yellow]⚠ Plugin name doesn't exactly match. Found:[/yellow] [bold green]{project.name}[/bold green] [dim](ID: {project.id})[/dim]")
+        typer.confirm(f"Do you want to install {project.name}?", abort=True)
 
     target: str = ""
     if snapshot and project.latest:
@@ -115,11 +152,11 @@ def install(
 
     if target:
         file = project.versions[target]
-        typer.echo(f"Installing latest {file.version_type}: {project.name}-{file.version_name} (ID: {file.version_id})")
+        print_info(f"Installing [bold]{project.name}[/bold] [cyan]{file.version_name}[/cyan] ({file.version_type})")
         manager.install_plugin(file)
-        typer.echo("Installation complete.")
+        print_success("Installation complete!")
     else:
-        typer.echo("No available versions to install.")
+        print_error("No available versions to install.")
         raise typer.Exit(code=1)
 
 
@@ -129,17 +166,23 @@ def status(
     platform: str = typer.Option(DEFAULT_PLATFORM, help="Plugin platform to query"),):
     connector = get_connector(platform)
     files = os.listdir("./plugins")
+    
+    plugins_data = []
     for file in files:
         path = Path("./plugins") / file
         if path.is_file():
             sha1 = get_sha1(path)
-            file_info = connector.get_file_info(sha1)
-            typer.echo(f"{file}: {sha1}")
-            typer.echo(f"  Name: {file_info.version_name}")
-            typer.echo(f"  Version ID: {file_info.version_id}")
-            typer.echo(f"  Version Type: {file_info.version_type}")
-            typer.echo(f"  Download URL: {file_info.release_date}")
-            typer.echo("")
+            try:
+                file_info = connector.get_file_info(sha1)
+                plugins_data.append((file, file_info))
+            except Exception as e:
+                print_warning(f"Could not fetch info for {file}: {e}")
+    
+    if plugins_data:
+        table = create_installed_plugins_table(plugins_data)
+        console.print(table)
+    else:
+        print_warning("No plugins found in ./plugins directory.")
 
 
 @app.callback()
@@ -147,13 +190,13 @@ def initialize_cli(ctx: typer.Context,
                    platform: str = typer.Option(DEFAULT_PLATFORM, help="Plugin platform to query")
                    ):
     """
-    Manage users in the awesome CLI app.
+    PaperMC Plugin Manager - Manage plugins for your PaperMC server.
     """
     game_version = get_papermc_version()
     if not game_version:
-        typer.echo("Could not determine PaperMC version. Please run this command in a PaperMC server directory.")
+        print_error("Could not determine PaperMC version. Please run this command in a PaperMC server directory.")
         raise typer.Exit()
-    typer.echo(f"PaperMC version: {game_version}")
+    print_info(f"PaperMC version: [bold green]{game_version}[/bold green]")
     ctx.obj = CliContext(
         game_version=game_version,
         default_platform=platform,

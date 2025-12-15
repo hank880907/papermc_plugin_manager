@@ -1,9 +1,9 @@
 from requests import HTTPError
-from logzero import logger
 import os
 from typing import Tuple
 
 from .connector_interface import ConnectorInterface, ProjectInfo, FileInfo
+from .console import console
 
 
 class PluginManager:
@@ -35,12 +35,12 @@ class PluginManager:
         except HTTPError:
             pass
 
-        logger.info(f"Plugin {name} not found by ID, searching by name...")
+        console.print(f"[dim]Plugin {name} not found by ID, searching by name...[/dim]")
         results = self.connector.query(name, self.game_version)
         for project_id, project_info in results.items():
             return False, project_info
         
-        logger.info(f"No results found for plugin {name}.")
+        console.print(f"[yellow]No results found for plugin {name}.[/yellow]")
         return None
     
     def install_plugin(self, plugin: FileInfo):

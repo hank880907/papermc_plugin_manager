@@ -259,6 +259,8 @@ class Version(BaseModel):
             requests.HTTPError: If the download fails
         """
         import os
+        from rich.progress import Progress, BarColumn, DownloadColumn, TransferSpeedColumn, TimeRemainingColumn
+        from ..console import console
         
         primary = self.primary_file
         if not primary:
@@ -274,10 +276,24 @@ class Version(BaseModel):
         )
         response.raise_for_status()
         
-        with open(filepath, "wb") as f:
-            for chunk in response.iter_content(chunk_size=1024 * 256):
-                if chunk:
-                    f.write(chunk)
+        # Get total file size
+        total_size = int(response.headers.get('content-length', 0))
+        
+        with Progress(
+            "[progress.description]{task.description}",
+            BarColumn(),
+            DownloadColumn(),
+            TransferSpeedColumn(),
+            TimeRemainingColumn(),
+            console=console,
+        ) as progress:
+            task = progress.add_task(f"[cyan]Downloading {primary.filename}...", total=total_size)
+            
+            with open(filepath, "wb") as f:
+                for chunk in response.iter_content(chunk_size=1024 * 256):
+                    if chunk:
+                        f.write(chunk)
+                        progress.update(task, advance=len(chunk))
         
         return filepath
 

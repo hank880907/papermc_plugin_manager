@@ -16,7 +16,7 @@ def version_to_file_info(version: Version) -> FileInfo:
         version_type=version.version_type.name,
         release_date=version.date_published,
         mc_versions=version.game_versions,
-        hashes=version.files[0].hashes,
+        hashes={"sha1": version.files[0].hashes.sha1, "sha512": version.files[0].hashes.sha512},
         url=version.files[0].url,
         description=version.changelog or "",
     )
