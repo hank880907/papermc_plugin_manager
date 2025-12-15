@@ -6,30 +6,29 @@ from datetime import datetime
 
 
 @dataclass
-class PluginVersionInfo:
+class FileInfo:
     version_id: str
     project_id: str
     version_name: str
     version_type: str
     release_date: datetime
     mc_versions: list[str]
-    hashes: dict[str, str]
-    download_url: str
+    hashes: Dict[str, str]
+    url: str
     
     def __str__(self) -> str:
         return f"{self.version_name}"
     
 
 @dataclass
-class PluginInfo:
+class ProjectInfo:
     name: str
     id: str
     author: str
     description: Optional[str]
     downloads: int
-    supported_versions: list[str]
-    stable_version: Optional[PluginVersionInfo] = None
-    latest_version: Optional[PluginVersionInfo] = None
+    latest: Optional[FileInfo] = None
+    latest_release: Optional[FileInfo] = None
     
     
     def __str__(self) -> str:
@@ -47,31 +46,38 @@ class PluginInfo:
             f"{Fore.YELLOW}{'ID:':<{max_label_len}} {Fore.WHITE}{self.id}",
             f"{Fore.YELLOW}{'Author:':<{max_label_len}} {Fore.WHITE}{self.author}",
             f"{Fore.YELLOW}{'Downloads:':<{max_label_len}} {Fore.WHITE}{self.downloads:,}",
-            f"{Fore.YELLOW}{'Stable Version:':<{max_label_len}} {Fore.WHITE}{self.stable_version if self.stable_version else 'N/A'}",
-            f"{Fore.YELLOW}{'Latest Version:':<{max_label_len}} {Fore.WHITE}{self.latest_version if self.latest_version else 'N/A'}"
+            f"{Fore.YELLOW}{'latest:':<{max_label_len}} {Fore.WHITE}{self.latest if self.latest else 'N/A'}",
+            f"{Fore.YELLOW}{'latest release:':<{max_label_len}} {Fore.WHITE}{self.latest_release if self.latest_release else 'N/A'}"
         ]
         if self.description:
             lines.append(f"{Fore.YELLOW}Description:")
             lines.append(f"{Fore.WHITE}{self.description}")
-        lines.append(f"{Fore.YELLOW}{'Supported Versions:':<{max_label_len}} {Fore.WHITE}{', '.join(self.supported_versions)}")        
         return "\n".join(lines)
     
 
-@dataclass
-class CliContext:
-    game_version: str
+
 
 
 class ConnectorInterface(ABC):
     
     @abstractmethod
-    def download(self, id) -> None:
-        """Download a file from the given URL to the specified destination."""
+    def download(self, id: str, dest: str) -> None:
+        """Download a file from the given id to the specified destination."""
         pass
     
     @abstractmethod
-    def query(self, name: str, byid: bool = False) -> Dict[str, PluginInfo]:
+    def query(self, name: str, mc_version: Optional[str] = None, limit: int = 5) -> Dict[str, ProjectInfo]:
         """Query information about a plugin by its name."""
+        pass
+
+    @abstractmethod
+    def get_project_info(self, id: str) -> ProjectInfo:
+        """Get detailed information about a project by its ID."""
+        pass
+
+    @abstractmethod
+    def get_file_info(self, id: str) -> FileInfo:
+        """Get detailed information about a file by its ID."""
         pass
 
 
@@ -96,3 +102,10 @@ def get_connector(connector: str, **kwargs) -> ConnectorInterface:
         if subclass.__name__.lower() == connector.lower():
             return subclass(**kwargs)
     raise ValueError(f"No connector found for {connector}")
+
+
+@dataclass
+class CliContext:
+    game_version: str
+    default_platform: str
+    connector: ConnectorInterface

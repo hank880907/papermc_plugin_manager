@@ -6,9 +6,20 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "colorama>=0.4.6",
+    "logzero>=1.7.0",
+    "pydantic>=2.12.5",
     "requests>=2.32.5",
     "typer>=0.20.0",
 ]
 
 [project.scripts]
 ppm = "papermc_plugin_manager.__main__:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
