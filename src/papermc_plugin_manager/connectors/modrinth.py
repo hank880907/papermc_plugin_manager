@@ -29,8 +29,9 @@ class Modrinth(ConnectorInterface):
         "User-Agent": "hank880907/modrinth-plugin-downloader/0.1 (hank880907@gmail.com)",
     }
 
-    def download(self, file: FileInfo, dest: str) -> None:
-        Version.get(file.version_id).download_primary_file(dest)
+    def download(self, file: FileInfo, dest: str):
+        """Download a file and yield progress information."""
+        yield from Version.get(file.version_id).download_primary_file(dest)
 
     @lru_cache(maxsize=128)
     def query(self, name: str, mc_version: Optional[str] = None, limit: int = 5) -> Dict[str, ProjectInfo]:

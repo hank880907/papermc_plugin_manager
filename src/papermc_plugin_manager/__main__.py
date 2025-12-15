@@ -153,7 +153,24 @@ def install(
     if target:
         file = project.versions[target]
         print_info(f"Installing [bold]{project.name}[/bold] [cyan]{file.version_name}[/cyan] ({file.version_type})")
-        manager.install_plugin(file)
+        
+        # Download with progress bar
+        from rich.progress import Progress, BarColumn, DownloadColumn, TransferSpeedColumn, TimeRemainingColumn
+        
+        with Progress(
+            "[progress.description]{task.description}",
+            BarColumn(),
+            DownloadColumn(),
+            TransferSpeedColumn(),
+            TimeRemainingColumn(),
+            console=console,
+        ) as progress:
+            task = None
+            for bytes_downloaded, total_size, chunk, filename in manager.install_plugin(file):
+                if task is None:
+                    task = progress.add_task(f"[cyan]Downloading {filename}...", total=total_size)
+                progress.update(task, completed=bytes_downloaded)
+        
         print_success("Installation complete!")
     else:
         print_error("No available versions to install.")

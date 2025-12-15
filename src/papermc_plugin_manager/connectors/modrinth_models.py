@@ -5,8 +5,8 @@ Based on Modrinth API v2 documentation: https://docs.modrinth.com/api
 """
 
 from datetime import datetime
-from typing import List, Optional, Dict, Any, ClassVar
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from typing import List, Optional, Dict, Any
+from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
 import requests
 import json
@@ -244,23 +244,21 @@ class Version(BaseModel):
         data = ModrinthAPIConfig.api_get(f"/project/{project_id}/version", params=params)
         return [cls(**version_data) for version_data in data]
     
-    def download_primary_file(self, dest_dir: str = ".") -> str:
+    def download_primary_file(self, dest_dir: str = "."):
         """
         Download the primary file of this version.
         
         Args:
             dest_dir: Destination directory for the download
             
-        Returns:
-            Path to the downloaded file
+        Yields:
+            tuple: (bytes_downloaded, total_size, chunk, filename) for each chunk
             
         Raises:
             ValueError: If no primary file is found
             requests.HTTPError: If the download fails
         """
         import os
-        from rich.progress import Progress, BarColumn, DownloadColumn, TransferSpeedColumn, TimeRemainingColumn
-        from ..console import console
         
         primary = self.primary_file
         if not primary:
@@ -278,22 +276,14 @@ class Version(BaseModel):
         
         # Get total file size
         total_size = int(response.headers.get('content-length', 0))
+        bytes_downloaded = 0
         
-        with Progress(
-            "[progress.description]{task.description}",
-            BarColumn(),
-            DownloadColumn(),
-            TransferSpeedColumn(),
-            TimeRemainingColumn(),
-            console=console,
-        ) as progress:
-            task = progress.add_task(f"[cyan]Downloading {primary.filename}...", total=total_size)
-            
-            with open(filepath, "wb") as f:
-                for chunk in response.iter_content(chunk_size=1024 * 256):
-                    if chunk:
-                        f.write(chunk)
-                        progress.update(task, advance=len(chunk))
+        with open(filepath, "wb") as f:
+            for chunk in response.iter_content(chunk_size=1024 * 256):
+                if chunk:
+                    f.write(chunk)
+                    bytes_downloaded += len(chunk)
+                    yield (bytes_downloaded, total_size, chunk, primary.filename)
         
         return filepath
 

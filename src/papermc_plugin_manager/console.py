@@ -55,20 +55,20 @@ def create_search_results_table(results: Dict) -> Table:
         title_style="bold cyan",
     )
     
-    table.add_column("#", style="dim", width=3, justify="right")
+    table.add_column("ID", style="dim", width=10, justify="left")
     table.add_column("Name", style="bold green", no_wrap=False)
     table.add_column("Author", style="cyan")
     table.add_column("Downloads", justify="right", style="yellow")
     table.add_column("Description", no_wrap=False, style="white")
     
-    for i, (plugin_id, project) in enumerate(results.items(), start=1):
+    for plugin_id, project in results.items():
         # Truncate description if too long
         desc = project.description or ""
         if len(desc) > 60:
             desc = desc[:57] + "..."
         
         table.add_row(
-            str(i),
+            plugin_id,
             project.name,
             project.author,
             f"{project.downloads:,}",
@@ -95,8 +95,8 @@ def create_version_table(versions_data: list, title: str = "Available Versions")
     table.add_column("MC Versions", style="dim")
     
     for version_id, file_info in versions_data:
-        # Format Minecraft versions
-        mc_versions = ", ".join(file_info.mc_versions[:3])  # Show first 3 versions
+        # Format Minecraft versions (showing newest first)
+        mc_versions = ", ".join(reversed(file_info.mc_versions[-3:]))  # Show last 3 versions in reverse (newest first)
         if len(file_info.mc_versions) > 3:
             mc_versions += f" +{len(file_info.mc_versions) - 3} more"
         

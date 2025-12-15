@@ -42,8 +42,12 @@ class ProjectInfo:
 class ConnectorInterface(ABC):
     
     @abstractmethod
-    def download(self, file: FileInfo, dest: str) -> None:
-        """Download a file from the given id to the specified destination."""
+    def download(self, file: FileInfo, dest: str):
+        """Download a file from the given id to the specified destination.
+        
+        Yields:
+            tuple: (bytes_downloaded, total_size, chunk, filename) for each chunk downloaded
+        """
         pass
     
     @abstractmethod

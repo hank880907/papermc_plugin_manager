@@ -44,4 +44,9 @@ class PluginManager:
         return None
     
     def install_plugin(self, plugin: FileInfo):
-        self.connector.download(plugin, "plugins")
+        """Install a plugin and yield download progress.
+        
+        Yields:
+            tuple: (bytes_downloaded, total_size, chunk, filename) for each chunk
+        """
+        yield from self.connector.download(plugin, "plugins")
