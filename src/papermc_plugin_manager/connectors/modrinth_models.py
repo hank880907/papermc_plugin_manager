@@ -173,6 +173,7 @@ class Version(BaseModel):
                 return file
         return self.files[0] if self.files else None
     
+
     @classmethod
     def get(cls, version_id: str) -> "Version":
         """
@@ -190,6 +191,7 @@ class Version(BaseModel):
         data = ModrinthAPIConfig.api_get(f"/version/{version_id}")
         return cls(**data)
     
+
     @classmethod
     def get_by_hash(cls, hash: str, algorithm: str = "sha1") -> "Version":
         """
@@ -207,7 +209,7 @@ class Version(BaseModel):
         """
         data = ModrinthAPIConfig.api_get(f"/version_file/{hash}", params={"algorithm": algorithm})
         return cls(**data)
-    
+
     @classmethod
     def list_for_project(
         cls,

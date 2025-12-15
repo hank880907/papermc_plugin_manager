@@ -5,6 +5,7 @@ from .modrinth_models import Version, SearchResponse, Project, TeamMember
 import requests
 import json
 from typing import Dict, Optional
+from functools import lru_cache
 
 
 def version_to_file_info(version: Version) -> FileInfo:
@@ -12,11 +13,12 @@ def version_to_file_info(version: Version) -> FileInfo:
         project_id=version.project_id,
         version_id=version.id,
         version_name=version.version_number,
-        version_type=version.version_type,
+        version_type=version.version_type.name,
         release_date=version.date_published,
         mc_versions=version.game_versions,
         hashes=version.files[0].hashes,
         url=version.files[0].url,
+        description=version.changelog or "",
     )
 
 class Modrinth(ConnectorInterface):
@@ -24,12 +26,13 @@ class Modrinth(ConnectorInterface):
     API_BASE = "https://api.modrinth.com/v2"
     HEADERS = {
         # Modrinth requires a uniquely identifying User-Agent (ideally with contact info)
-        "User-Agent": "hank880907/modrinth-plugin-downloader/0.1 (you@example.com)",
+        "User-Agent": "hank880907/modrinth-plugin-downloader/0.1 (hank880907@gmail.com)",
     }
 
-    def download(self, id: str, dest: str) -> None:
-        Version.get(id).download_primary_file(dest)
-    
+    def download(self, file: FileInfo, dest: str) -> None:
+        Version.get(file.version_id).download_primary_file(dest)
+
+    @lru_cache(maxsize=128)
     def query(self, name: str, mc_version: Optional[str] = None, limit: int = 5) -> Dict[str, ProjectInfo]:
         facets = []
         facets.append(["categories:paper"])
@@ -42,7 +45,7 @@ class Modrinth(ConnectorInterface):
             results[hit.project_id] = self.get_project_info(hit.project_id)
         return results
 
-
+    @lru_cache(maxsize=128)
     def get_project_info(self, id: str) -> ProjectInfo:
         modrinth_project = Project.get(id)
         members = TeamMember.list_for_project(id)
@@ -62,13 +65,17 @@ class Modrinth(ConnectorInterface):
         versions = Version.list_for_project(id, loaders=["paper"])
         if not versions:
             return plugin_info
-        plugin_info.latest = version_to_file_info(versions[0])
+        plugin_info.latest = versions[0].id
         for version in versions:
             if version.version_type == "release":
-                plugin_info.latest_release = version_to_file_info(version)
+                plugin_info.latest_release = version.id
                 break
+        for version in versions:
+            file_info = version_to_file_info(version)
+            plugin_info.versions[file_info.version_id] = file_info
         return plugin_info
 
+    @lru_cache(maxsize=128)
     def get_file_info(self, id: str) -> FileInfo:
         """Get detailed information about a file by its ID."""
         try:

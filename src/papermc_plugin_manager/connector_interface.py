@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, Dict
 from colorama import Fore, Style, init
 from datetime import datetime
@@ -15,10 +15,11 @@ class FileInfo:
     mc_versions: list[str]
     hashes: Dict[str, str]
     url: str
+    description: str = ""
     
     def __str__(self) -> str:
-        return f"{self.version_name}"
-    
+        return f"{self.version_name} ({self.version_type}) - Released on {self.release_date.strftime('%Y-%m-%d')}"
+
 
 @dataclass
 class ProjectInfo:
@@ -27,8 +28,9 @@ class ProjectInfo:
     author: str
     description: Optional[str]
     downloads: int
-    latest: Optional[FileInfo] = None
-    latest_release: Optional[FileInfo] = None
+    latest: Optional[str] = None
+    latest_release: Optional[str] = None
+    versions: Dict[str, FileInfo] = field(default_factory=dict)
     
     
     def __str__(self) -> str:
@@ -61,7 +63,7 @@ class ProjectInfo:
 class ConnectorInterface(ABC):
     
     @abstractmethod
-    def download(self, id: str, dest: str) -> None:
+    def download(self, file: FileInfo, dest: str) -> None:
         """Download a file from the given id to the specified destination."""
         pass
     
