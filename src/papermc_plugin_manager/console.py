@@ -18,6 +18,7 @@ def create_plugin_info_panel(
     latest_release: str | None,
     description: str | None = None,
     installed_info: str | None = None,
+    compatibility_info: str | None = None,
 ) -> Panel:
     """Create a Rich Panel for displaying plugin information."""
 
@@ -32,6 +33,8 @@ def create_plugin_info_panel(
     if installed_info:
         content.append("")
         content.append(installed_info)
+        if compatibility_info:
+            content.append(compatibility_info)
 
     if description:
         content.append("")
@@ -80,7 +83,7 @@ def create_search_results_table(results: dict) -> Table:
     return table
 
 
-def create_version_table(versions_data: list, title: str = "Available Versions") -> Table:
+def create_version_table(versions_data: list, title: str = "Available Versions", game_version: str = None) -> Table:
     """Create a Rich Table for displaying version information."""
 
     table = Table(
@@ -111,9 +114,37 @@ def create_version_table(versions_data: list, title: str = "Available Versions")
         else:
             type_style = "[red]●[/red] ALPHA"
 
+        # Check compatibility with game version
+        compatibility_icon = ""
+        if game_version and file_info.mc_versions:
+            # Parse game version into parts
+            game_parts = game_version.split(".")
+
+            # Check each supported version for best match
+            best_match = 0  # 0 = no match, 2 = two digits, 3 = three digits
+            for mc_version in file_info.mc_versions:
+                mc_parts = mc_version.split(".")
+
+                # Check for three-digit match
+                if len(game_parts) >= 3 and len(mc_parts) >= 3 and game_parts[:3] == mc_parts[:3]:
+                    best_match = 3
+                    break
+
+                # Check for two-digit match
+                if len(game_parts) >= 2 and len(mc_parts) >= 2 and game_parts[:2] == mc_parts[:2]:
+                    best_match = max(best_match, 2)
+
+            # Set icon based on best match
+            if best_match == 3:
+                compatibility_icon = "[green]✓[/green] "
+            elif best_match == 2:
+                compatibility_icon = "[yellow]⚠[/yellow] "
+            elif file_info.mc_versions:  # Has version info but no match
+                compatibility_icon = "[red]✗[/red] "
+
         table.add_row(
             version_id,
-            file_info.version_name,
+            f"{compatibility_icon}{file_info.version_name}",
             type_style,
             file_info.release_date.strftime("%Y-%m-%d"),
             mc_versions,

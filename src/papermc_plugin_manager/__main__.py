@@ -1,5 +1,6 @@
-import typer
 from importlib.metadata import version as get_package_version
+
+import typer
 from logzero import logger
 
 from papermc_plugin_manager.connector_interface import CliContext, get_connector
@@ -25,7 +26,7 @@ from .exceptions import (
     VersionNotFoundException,
 )
 from .plugin_manager import PluginManager
-from .utils import get_papermc_version, setup_logging
+from .utils import get_papermc_version, get_sha1, setup_logging
 
 app = typer.Typer(
     help="PaperMC Plugin Manager - Manage plugins for your PaperMC server.",
@@ -182,9 +183,38 @@ def show(
     # Check if plugin is installed
     installed_plugin = manager.get_installed_plugin_by_project_id(project.id)
     installed_info = None
+    compatibility_info = None
     if installed_plugin:
         filename, file_info = installed_plugin
         installed_info = f"[green]✓ Installed:[/green] {file_info.version_name} [dim]({filename})[/dim]"
+
+        # Calculate compatibility with game version
+        game_version = cli_ctx.game_version
+        if game_version and file_info.mc_versions:
+            # Parse game version into parts
+            game_parts = game_version.split(".")
+
+            # Check each supported version for best match
+            best_match = 0  # 0 = no match, 2 = two digits, 3 = three digits
+            for mc_version in file_info.mc_versions:
+                mc_parts = mc_version.split(".")
+
+                # Check for three-digit match
+                if len(game_parts) >= 3 and len(mc_parts) >= 3 and game_parts[:3] == mc_parts[:3]:
+                    best_match = 3
+                    break
+
+                # Check for two-digit match
+                if len(game_parts) >= 2 and len(mc_parts) >= 2 and game_parts[:2] == mc_parts[:2]:
+                    best_match = max(best_match, 2)
+
+            # Set compatibility info
+            if best_match == 3:
+                compatibility_info = f"[green]✓ Compatible[/green] with server version [cyan]{game_version}[/cyan]"
+            elif best_match == 2:
+                compatibility_info = f"[yellow]⚠ Partially Compatible[/yellow] (supports [cyan]{', '.join(file_info.mc_versions)}[/cyan], server is [cyan]{game_version}[/cyan])"
+            else:
+                compatibility_info = f"[red]✗ Not Compatible[/red] (supports [cyan]{', '.join(file_info.mc_versions)}[/cyan], server is [cyan]{game_version}[/cyan])"
     else:
         installed_info = "[dim]Not installed[/dim]"
 
@@ -207,6 +237,7 @@ def show(
         latest_release=latest_release_name,
         description=project.description,
         installed_info=installed_info,
+        compatibility_info=compatibility_info,
     )
     console.print(panel)
     console.print()
@@ -235,7 +266,9 @@ def show(
             i += 1
 
         if versions_data:
-            table = create_version_table(versions_data, f"Available Versions (showing {len(versions_data)})")
+            table = create_version_table(
+                versions_data, f"Available Versions (showing {len(versions_data)})", game_version=cli_ctx.game_version
+            )
             console.print(table)
     else:
         # Try to find version by version_id first, then by version_name
@@ -367,16 +400,64 @@ def install(
                 console=console,
             ) as progress:
                 task = None
+                installed_filename = None
                 for bytes_downloaded, total_size, _chunk, filename in manager.install_plugin(
                     file, allow_replace=allow_replace
                 ):
                     downloaded = True
+                    installed_filename = filename
                     if task is None:
                         task = progress.add_task(f"[cyan]Downloading {filename}...", total=total_size)
                     progress.update(task, completed=bytes_downloaded)
 
             if downloaded:
                 print_success("Installation complete!")
+
+                # Refresh cache for the newly installed plugin
+                from pathlib import Path
+
+                plugins_dir = Path(Config.get_plugins_dir())
+                if installed_filename and plugins_dir.exists():
+                    installed_file_path = plugins_dir / installed_filename
+                    if installed_file_path.exists():
+                        print_info("Updating cache...")
+                        sha1 = get_sha1(installed_file_path)
+                        try:
+                            # Get file info and project info
+                            file_info = connector.get_file_info(sha1)
+                            project_info = connector.get_project_info(file_info.project_id)
+
+                            # Check if outdated
+                            is_outdated = False
+                            latest_version = None
+                            latest_version_id = None
+                            if file_info.version_type == "RELEASE" and project_info.latest_release:
+                                latest_version_id = project_info.latest_release
+                            elif file_info.version_type in ["BETA", "ALPHA"] and project_info.latest:
+                                latest_version_id = project_info.latest
+
+                            if latest_version_id and latest_version_id != file_info.version_id:
+                                latest_file = project_info.versions.get(latest_version_id)
+                                if latest_file and latest_file.version_type == file_info.version_type:
+                                    is_outdated = manager._compare_versions(
+                                        file_info.version_name, latest_file.version_name
+                                    )
+                                    if is_outdated:
+                                        latest_version = latest_file.version_name
+
+                            # Update cache
+                            manager.cache_manager.cache_plugin(
+                                filename=installed_filename,
+                                sha1=sha1,
+                                file_info=file_info,
+                                is_outdated=is_outdated,
+                                project_name=project_info.name,
+                                latest_version=latest_version,
+                            )
+                            manager.cache_manager.cache_project(file_info.project_id, project_info)
+                            manager.cache_manager.save()
+                        except Exception as e:
+                            logger.debug(f"Failed to update cache: {e}")
         except Exception as e:
             print_error(f"Installation failed: {e}")
             raise typer.Exit(code=1)
