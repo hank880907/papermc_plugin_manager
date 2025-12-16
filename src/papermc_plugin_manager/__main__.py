@@ -1,4 +1,5 @@
 import typer
+from importlib.metadata import version as get_package_version
 from logzero import logger
 
 from papermc_plugin_manager.connector_interface import CliContext, get_connector
@@ -633,7 +634,11 @@ def initialize_cli(
     logger.debug("PPM starting")
 
     if version:
-        console.print("[cyan]PaperMC Plugin Manager[/cyan] [green]v0.1.0[/green]")
+        try:
+            pkg_version = get_package_version("papermc-plugin-manager")
+        except Exception:
+            pkg_version = "unknown"
+        console.print(f"[cyan]PaperMC Plugin Manager[/cyan] [green]v{pkg_version}[/green]")
         raise typer.Exit()
 
     # Only check for server version if we're running a command
