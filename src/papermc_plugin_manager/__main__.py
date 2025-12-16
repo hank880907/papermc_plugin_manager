@@ -352,7 +352,7 @@ def list_plugins(
     
     console.print()  # Add blank line before table
     if plugins_data:
-        table = create_installed_plugins_table(plugins_data)
+        table = create_installed_plugins_table(plugins_data, game_version=ctx.obj.game_version)
         console.print(table)
     else:
         print_warning("No identified plugins found in ./plugins directory.")
