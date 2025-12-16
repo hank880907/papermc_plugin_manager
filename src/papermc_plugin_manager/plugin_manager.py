@@ -47,9 +47,9 @@ class PluginManager:
         except Exception as e:
             console.print(f"[yellow]⚠ Failed to save cache: {e}[/yellow]")
 
-    def _cache_file_info(self, file_name: str, sha1: str, file_info: FileInfo, is_outdated: bool, project_name: str) -> dict:
+    def _cache_file_info(self, file_name: str, sha1: str, file_info: FileInfo, is_outdated: bool, project_name: str, latest_version: str = None) -> dict:
         """Create cache entry for a file."""
-        return {
+        cache_entry = {
             'sha1': sha1,
             'version_id': file_info.version_id,
             'project_id': file_info.project_id,
@@ -64,6 +64,9 @@ class PluginManager:
             'is_outdated': is_outdated,
             'last_checked': datetime.now().isoformat(),
         }
+        if latest_version:
+            cache_entry['latest_version'] = latest_version
+        return cache_entry
 
     def _file_info_from_cache(self, cache_entry: dict) -> FileInfo:
         """Reconstruct FileInfo from cache entry."""
@@ -373,7 +376,7 @@ class PluginManager:
         # Proceed with download (new installation or after replacement)
         yield from self.connector.download(plugin, "plugins")
 
-    def get_installed_plugins(self, plugins_dir: str = "./plugins", force_refresh: bool = False, status_callback=None) -> List[Tuple[str, FileInfo, bool, str]]:
+    def get_installed_plugins(self, plugins_dir: str = "./plugins", force_refresh: bool = False, status_callback=None) -> Tuple[List[Tuple[str, FileInfo, bool, str, str, str | None]], List[Tuple[str, str, int]]]:
         """Get list of installed plugins with their information.
         
         This method handles all caching transparently. It will:
@@ -382,6 +385,7 @@ class PluginManager:
         - Check if plugins are outdated
         - Update cache automatically
         - Clean up stale cache entries
+        - Track unidentified plugins separately
         
         Args:
             plugins_dir: Directory containing plugin files
@@ -389,11 +393,18 @@ class PluginManager:
             status_callback: Optional callback function for status updates (e.g., status.update)
         
         Returns:
-            List of tuples: (filename, FileInfo, is_outdated, project_name)
+            Tuple of (identified_plugins, unidentified_plugins):
+            - identified_plugins: List of tuples (filename, FileInfo, is_outdated, project_name, project_id, latest_version)
+            - unidentified_plugins: List of tuples (filename, sha1, file_size)
         """
         files = os.listdir(plugins_dir)
         plugins_data = []
+        unidentified_plugins = []
         cache_updated = False
+        
+        # Initialize unidentified section in cache if not exists
+        if 'unidentified' not in self.cache:
+            self.cache['unidentified'] = {}
         
         for file in files:
             path = Path(plugins_dir) / file
@@ -412,6 +423,15 @@ class PluginManager:
                 self.cache['plugins'][file].get('sha1') == sha1
             )
             
+            # Check if this is an unidentified plugin in cache
+            if file in self.cache.get('unidentified', {}):
+                if status_callback:
+                    status_callback(f"[dim]Using cached data for unidentified {file}...[/dim]")
+                unidentified_entry = self.cache['unidentified'][file]
+                file_size = unidentified_entry.get('size', 0)
+                unidentified_plugins.append((file, sha1, file_size))
+                continue
+            
             if use_cache:
                 # Use cached data
                 if status_callback:
@@ -421,7 +441,9 @@ class PluginManager:
                     file_info = self._file_info_from_cache(cache_entry)
                     is_outdated = cache_entry.get('is_outdated', False)
                     project_name = cache_entry.get('project_name', file)
-                    plugins_data.append((file, file_info, is_outdated, project_name))
+                    project_id = cache_entry.get('project_id', '')
+                    latest_version = cache_entry.get('latest_version')
+                    plugins_data.append((file, file_info, is_outdated, project_name, project_id, latest_version))
                     continue
                 except Exception:
                     # If cache read fails, fetch fresh data
@@ -439,6 +461,7 @@ class PluginManager:
                         status_callback(f"[bold magenta]Checking for updates for {file}...")
                     is_outdated = False
                     project_name = file  # Default to filename
+                    latest_version = None
                     
                     try:
                         project_info = self.connector.get_project_info(file_info.project_id)
@@ -459,18 +482,31 @@ class PluginManager:
                             latest_file = project_info.versions.get(latest_version_id)
                             if latest_file and latest_file.version_type == file_info.version_type:
                                 is_outdated = self._compare_versions(file_info.version_name, latest_file.version_name)
+                                if is_outdated:
+                                    latest_version = latest_file.version_name
                     except Exception:
                         # If we can't check for updates, assume it's not outdated
                         pass
                     
-                    plugins_data.append((file, file_info, is_outdated, project_name))
+                    plugins_data.append((file, file_info, is_outdated, project_name, file_info.project_id, latest_version))
                     
                     # Update cache
-                    self.cache['plugins'][file] = self._cache_file_info(file, sha1, file_info, is_outdated, project_name)
+                    self.cache['plugins'][file] = self._cache_file_info(file, sha1, file_info, is_outdated, project_name, latest_version)
                     cache_updated = True
                     
                 except Exception as e:
-                    console.print(f"[yellow]⚠ Could not fetch info for {file}: {e}[/yellow]")
+                    # Plugin not found in Modrinth - add to unidentified list
+                    if status_callback:
+                        status_callback(f"[dim]Plugin {file} not found in Modrinth[/dim]")
+                    file_size = path.stat().st_size
+                    unidentified_plugins.append((file, sha1, file_size))
+                    # Cache as unidentified
+                    self.cache['unidentified'][file] = {
+                        'sha1': sha1,
+                        'size': file_size,
+                        'last_checked': datetime.now().isoformat(),
+                    }
+                    cache_updated = True
         
         # Remove stale entries from cache (files that no longer exist)
         files_set = set(files)
@@ -479,8 +515,51 @@ class PluginManager:
             del self.cache['plugins'][cached_file]
             cache_updated = True
         
+        # Remove stale unidentified entries
+        stale_unidentified = [cached_file for cached_file in self.cache.get('unidentified', {}).keys() if cached_file not in files_set]
+        for cached_file in stale_unidentified:
+            del self.cache['unidentified'][cached_file]
+            cache_updated = True
+        
         # Save cache if it was updated
         if cache_updated:
             self._save_cache()
         
-        return plugins_data
+        return plugins_data, unidentified_plugins
+    
+    def remove_plugin(self, name: str) -> Tuple[str, str] | None:
+        """Remove a plugin by project ID or name.
+        
+        Args:
+            name: Project ID or project name to search for
+            
+        Returns:
+            Tuple of (filename, project_name) if found, None if not found
+        """
+        # First try to find the plugin by project ID or name
+        result = self.fuzzy_find_project(name)
+        if not result:
+            return None
+        
+        _, project_info = result
+        
+        # Find installed plugin with this project ID
+        installed = self.get_installed_plugin_by_project_id(project_info.id)
+        if not installed:
+            return None
+        
+        filename, file_info = installed
+        
+        # Delete the file
+        plugin_path = Path("./plugins") / filename
+        if plugin_path.exists():
+            plugin_path.unlink()
+            
+            # Remove from cache
+            if filename in self.cache.get('plugins', {}):
+                del self.cache['plugins'][filename]
+                self._save_cache()
+            
+            return (filename, project_info.name)
+        
+        return None

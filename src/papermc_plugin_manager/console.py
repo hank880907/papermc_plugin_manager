@@ -165,14 +165,14 @@ def create_installed_plugins_table(plugins_data: list) -> Table:
         header_style="bold magenta",
     )
     
+    table.add_column("Project ID", style="dim", width=10)
     table.add_column("Project", style="bold green")
     table.add_column("Version Name", style="cyan")
-    table.add_column("Version ID", style="yellow")
     table.add_column("Type", style="white")
     table.add_column("Release Date", style="dim")
     table.add_column("Status", style="white", justify="center")
     
-    for file_name, file_info, is_outdated, project_name in plugins_data:
+    for file_name, file_info, is_outdated, project_name, project_id, latest_version in plugins_data:
         # Style the version type
         version_type = file_info.version_type
         if version_type == "RELEASE":
@@ -182,16 +182,51 @@ def create_installed_plugins_table(plugins_data: list) -> Table:
         else:
             type_display = "[red]●[/red] ALPHA"
         
-        # Status indicator
-        status_display = "[yellow]⚠ Outdated[/yellow]" if is_outdated else "[green]✓ Current[/green]"
+        # Status indicator - show latest version if outdated
+        if is_outdated and latest_version:
+            status_display = f"[yellow]⚠ {latest_version}[/yellow]"
+        else:
+            status_display = "[green]✓ Current[/green]"
         
         table.add_row(
+            project_id,
             project_name,
             file_info.version_name,
-            file_info.version_id,
             type_display,
             file_info.release_date.strftime('%Y-%m-%d'),
             status_display,
+        )
+    
+    return table
+
+
+def create_unidentified_plugins_table(unidentified_data: list) -> Table:
+    """Create a Rich Table for displaying unidentified/unrecognized plugins."""
+    
+    table = Table(
+        title="[bold yellow]Unidentified Plugins[/bold yellow]",
+        box=box.ROUNDED,
+        show_header=True,
+        header_style="bold magenta",
+    )
+    
+    table.add_column("File Name", style="bold yellow")
+    table.add_column("SHA1", style="dim")
+    table.add_column("Size", style="cyan", justify="right")
+    
+    for filename, sha1, file_size in unidentified_data:
+        # Format file size
+        if file_size < 1024:
+            size_str = f"{file_size} B"
+        elif file_size < 1024 * 1024:
+            size_str = f"{file_size / 1024:.1f} KB"
+        else:
+            size_str = f"{file_size / (1024 * 1024):.1f} MB"
+        
+        table.add_row(
+            filename,
+            sha1[:16] + "...",  # Truncate SHA1 for display
+            size_str,
         )
     
     return table

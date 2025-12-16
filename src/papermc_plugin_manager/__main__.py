@@ -15,6 +15,7 @@ from .console import (
     create_version_table,
     create_version_detail_panel,
     create_installed_plugins_table,
+    create_unidentified_plugins_table,
     print_success,
     print_error,
     print_warning,
@@ -226,7 +227,7 @@ def list_plugins(
     manager = PluginManager(connector, ctx.obj.game_version)
     
     with console.status("[bold green]Scanning plugins...") as status:
-        plugins_data = manager.get_installed_plugins(
+        plugins_data, unidentified_data = manager.get_installed_plugins(
             plugins_dir="./plugins",
             force_refresh=False,
             status_callback=status.update
@@ -237,7 +238,15 @@ def list_plugins(
         table = create_installed_plugins_table(plugins_data)
         console.print(table)
     else:
-        print_warning("No plugins found in ./plugins directory.")
+        print_warning("No identified plugins found in ./plugins directory.")
+    
+    # Display unidentified plugins if any
+    if unidentified_data:
+        console.print()  # Add spacing
+        unidentified_table = create_unidentified_plugins_table(unidentified_data)
+        console.print(unidentified_table)
+        console.print()
+        print_info(f"Found {len(unidentified_data)} unidentified plugin(s). These may be from sources other than Modrinth.")
 
 
 @app.command()
@@ -252,7 +261,7 @@ def update(
     print_info("Updating plugin cache...")
     
     with console.status("[bold green]Fetching plugin information...") as status:
-        plugins_data = manager.get_installed_plugins(
+        plugins_data, unidentified_data = manager.get_installed_plugins(
             plugins_dir="./plugins",
             force_refresh=True,
             status_callback=status.update
@@ -260,12 +269,62 @@ def update(
     
     console.print()
     if plugins_data:
-        outdated_count = sum(1 for _, _, is_outdated, _ in plugins_data if is_outdated)
+        outdated_count = sum(1 for _, _, is_outdated, _, _, _ in plugins_data if is_outdated)
         print_success(f"Cache updated. Found {len(plugins_data)} plugin(s).")
         if outdated_count > 0:
             print_info(f"{outdated_count} plugin(s) can be upgraded. Run 'ppm upgrade' to upgrade them.")
-    else:
+    if unidentified_data:
+        print_info(f"Found {len(unidentified_data)} unidentified plugin(s) from non-Modrinth sources.")
+    if not plugins_data and not unidentified_data:
         print_warning("No plugins found.")
+
+
+@app.command()
+def rm(
+    ctx: typer.Context,
+    name: str = typer.Argument(..., help="Name or ID of the plugin to remove"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
+):
+    """Remove an installed plugin."""
+    cli_ctx: CliContext = ctx.obj
+    connector = cli_ctx.connector
+    manager = PluginManager(connector, cli_ctx.game_version)
+    
+    # Find the plugin
+    result = manager.fuzzy_find_project(name)
+    if not result:
+        print_error(f"Plugin '{name}' not found.")
+        raise typer.Exit(code=1)
+    
+    _, project_info = result
+    
+    # Check if plugin is installed
+    installed = manager.get_installed_plugin_by_project_id(project_info.id)
+    if not installed:
+        print_warning(f"Plugin '{project_info.name}' is not installed.")
+        raise typer.Exit(code=1)
+    
+    filename, file_info = installed
+    
+    # Show plugin info and confirm
+    console.print(f"\n[bold yellow]Plugin to remove:[/bold yellow]")
+    console.print(f"  Name: [cyan]{project_info.name}[/cyan]")
+    console.print(f"  File: [dim]{filename}[/dim]")
+    console.print(f"  Version: {file_info.version_name}\n")
+    
+    if not yes:
+        if not typer.confirm("Are you sure you want to remove this plugin?"):
+            print_warning("Removal cancelled.")
+            return
+    
+    # Remove the plugin
+    result = manager.remove_plugin(name)
+    if result:
+        removed_filename, removed_name = result
+        print_success(f"Removed {removed_name} ({removed_filename})")
+    else:
+        print_error(f"Failed to remove plugin.")
+        raise typer.Exit(code=1)
 
 
 @app.command()
@@ -280,14 +339,14 @@ def upgrade(
     
     # Get installed plugins with their status (from cache)
     with console.status("[bold green]Checking for outdated plugins...") as status:
-        plugins_data = manager.get_installed_plugins(
+        plugins_data, _ = manager.get_installed_plugins(
             plugins_dir="./plugins",
             force_refresh=False,  # Use cache only, like apt
             status_callback=status.update
         )
     
     # Filter outdated plugins
-    outdated_plugins = [(filename, file_info, project_name) for filename, file_info, is_outdated, project_name in plugins_data if is_outdated]
+    outdated_plugins = [(filename, file_info, project_name) for filename, file_info, is_outdated, project_name, project_id, latest_version in plugins_data if is_outdated]
     
     if not outdated_plugins:
         print_success("All plugins are up to date!")
