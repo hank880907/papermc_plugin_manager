@@ -15,20 +15,14 @@ A modern, user-friendly command-line tool for managing PaperMC server plugins. B
 
 ## Installation
 
-### Using uv (Recommended)
-
 ```bash
-git clone https://github.com/yourusername/papermc_plugin_manager.git
-cd papermc_plugin_manager
-uv sync
+pip install papermc-plugin-manager
 ```
 
-### Using pip
+Or using uv:
 
 ```bash
-git clone https://github.com/yourusername/papermc_plugin_manager.git
-cd papermc_plugin_manager
-pip install -e .
+uv pip install papermc-plugin-manager
 ```
 
 ## Usage
