@@ -5,39 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] - 2025-12-16
+## [0.0.2] - 2025-12-16
 
 ### Added
 
-- Configuration constants module (`config.py`) for centralized settings management
-- Custom exception classes for better error handling:
-  - `PluginNotFoundException`
-  - `VersionNotFoundException`
-  - `DownloadFailedException`
-  - `CacheException`
-  - `InvalidVersionException`
-  - `PluginAlreadyInstalledException`
-  - `ServerVersionException`
-- Environment variable support for configuration overrides:
-  - `PPM_CACHE_FILE` - Override cache file location
-  - `PPM_PLUGINS_DIR` - Override plugins directory
-  - `PPM_USER_AGENT` - Override API user agent
-  - `PPM_DEFAULT_PLATFORM` - Override default platform
-- Improved error messages with specific exception types
-- Better documentation in docstrings
-
-### Changed
-
-- Refactored all hard-coded paths and configuration values to use `Config` class
-- Improved error handling throughout the codebase
-- Updated User-Agent to include project repository URL
-- Bumped version from 0.0.1 to 0.1.0
-- Enhanced `get_papermc_version()` with better error handling
+- Comprehensive docstrings for all CLI commands
+- Better help messages explaining command behavior and options
 
 ### Fixed
 
-- Consistent error handling across all CLI commands
-- More informative error messages for common failure cases
+- Suppressed log output during shell autocomplete to prevent terminal pollution
+- Default log level changed to WARNING for cleaner output (use --verbose for DEBUG)
+- Fixed `ppm` with no arguments to show help and exit with code 2 instead of silently succeeding
+
+### Changed
+
+- Cache manager refactored to use dataclass serialization with `asdict()` and automatic field detection
+- Improved cache deserialization to handle extra fields gracefully
 
 ## [0.0.1] - 2025-12-15
 
