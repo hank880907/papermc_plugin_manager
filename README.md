@@ -13,6 +13,17 @@ A modern, user-friendly command-line tool for managing PaperMC server plugins. B
 - 🔄 **Version Detection**: Automatically detects outdated plugins
 - 📋 **Installation Status**: See which plugins are installed at a glance
 
+## Screenshots
+
+**List installed plugins** - View all installed plugins with version information and update status:
+![ppm list](media/ppm_list.png)
+
+**Search for plugins** - Find plugins across Modrinth with fuzzy matching:
+![ppm search](media/ppm_search.png)
+
+**Show plugin details** - Display comprehensive plugin information including metadata and available versions:
+![ppm show](media/ppm_show.png)
+
 ## Installation
 
 ```bash
