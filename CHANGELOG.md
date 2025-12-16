@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.3] - 2025-12-16
+
+### Added
+
+- Game version compatibility information displayed in `show` command's plugin info panel
+- Compatibility icons (✓/⚠/✗) shown in Available Versions table in `show` command
+- Automatic cache refresh after plugin installation for immediate availability
+
+### Changed
+
+- Version number now automatically fetched from `pyproject.toml` instead of hardcoded
+
 ## [0.0.2] - 2025-12-16
 
 ### Added
