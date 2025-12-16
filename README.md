@@ -25,6 +25,37 @@ Or using uv:
 uv pip install papermc-plugin-manager
 ```
 
+### Shell Completion (Optional)
+
+Enable tab completion for plugin names and versions:
+
+```bash
+# For zsh
+ppm --install-completion zsh
+
+# For bash
+ppm --install-completion bash
+
+# For fish
+ppm --install-completion fish
+```
+
+After installation, restart your terminal or source your shell configuration file.
+
+**Autocomplete features:**
+
+- Plugin names and IDs in `show`, `install`, and `rm` commands
+- Version numbers in `--version` option for `show` and `install` commands
+- All suggestions come from your local cache for instant results
+
+**Examples:**
+
+```bash
+ppm install Via<TAB>              # Suggests: ViaVersion
+ppm show CoreProtect --version 23<TAB>  # Suggests: 23.1, 23.0
+ppm rm Luck<TAB>                  # Suggests: LuckPerms, Lu3KuzdV
+```
+
 ## Usage
 
 ### Basic Commands

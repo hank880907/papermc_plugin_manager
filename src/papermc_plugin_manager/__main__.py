@@ -1,6 +1,7 @@
 import typer
 import os
-from typing import Optional
+import yaml
+from typing import Optional, List
 from papermc_plugin_manager.connector_interface import get_connector, CliContext
 from pathlib import Path
 from requests import HTTPError
@@ -26,6 +27,96 @@ app = typer.Typer()
 
 DEFAULT_PLATFORM = os.getenv("PPM_DEFAULT_PLATFORM", "modrinth")
 
+
+def plugin_name_autocomplete(incomplete: str) -> List[str]:
+    """Autocomplete function for plugin names from cache."""
+    cache_file = "papermc_plugin_manager.yaml"
+    suggestions = []
+    
+    if not os.path.exists(cache_file):
+        return suggestions
+    
+    try:
+        with open(cache_file, 'r') as f:
+            cache = yaml.safe_load(f)
+            if cache and 'projects' in cache:
+                for project_id, project_data in cache['projects'].items():
+                    project_name = project_data.get('name', '')
+                    # Add both project name and ID as suggestions
+                    if incomplete.lower() in project_name.lower():
+                        suggestions.append(project_name)
+                    if incomplete.lower() in project_id.lower():
+                        suggestions.append(project_id)
+    except Exception:
+        pass
+    
+    return suggestions
+
+
+def version_autocomplete(ctx: typer.Context, incomplete: str) -> List[str]:
+    """Autocomplete function for version names from cache.
+    
+    This extracts the plugin name from the command context and suggests
+    versions for that specific plugin.
+    """
+    cache_file = "papermc_plugin_manager.yaml"
+    suggestions = []
+    
+    if not os.path.exists(cache_file):
+        return suggestions
+    
+    # Get the plugin name from the command line arguments
+    # Parse from environment variable that Typer sets
+    import os as os_module
+    complete_args = os_module.environ.get('_TYPER_COMPLETE_ARGS', '')
+    
+    # Extract plugin name from the command line
+    # Format is usually: "ppm <command> <plugin_name> --version <incomplete>"
+    plugin_name = None
+    if complete_args:
+        parts = complete_args.split()
+        # Find the position after the command name
+        if len(parts) >= 3:
+            # parts[0] = 'ppm', parts[1] = command (show/install), parts[2] = plugin name
+            plugin_name = parts[2]
+    
+    if not plugin_name:
+        return suggestions
+    
+    try:
+        with open(cache_file, 'r') as f:
+            cache = yaml.safe_load(f)
+            if not cache or 'projects' not in cache:
+                return suggestions
+            
+            # Find the project by name or ID
+            project_data = None
+            plugin_name_lower = plugin_name.lower()
+            
+            # First try direct ID match
+            if plugin_name in cache['projects']:
+                project_data = cache['projects'][plugin_name]
+            else:
+                # Try name match
+                for project_id, proj_data in cache['projects'].items():
+                    if proj_data.get('name', '').lower() == plugin_name_lower:
+                        project_data = proj_data
+                        break
+            
+            if not project_data:
+                return suggestions
+            
+            # Get versions from cache
+            versions = project_data.get('versions', {})
+            for version_id, version_data in versions.items():
+                version_name = version_data.get('version_name', '')
+                if incomplete.lower() in version_name.lower():
+                    suggestions.append(version_name)
+    except Exception:
+        pass
+    
+    return suggestions
+
 @app.command()
 def search(
     ctx: typer.Context,
@@ -47,8 +138,8 @@ def search(
 @app.command()
 def show(
     ctx: typer.Context,
-    name: str = typer.Argument(..., help="Name or ID of the plugin to show"),
-    version: Optional[str] = typer.Option(None, help="Specific plugin version to show"),
+    name: str = typer.Argument(..., help="Name or ID of the plugin to show", autocompletion=plugin_name_autocomplete),
+    version: Optional[str] = typer.Option(None, help="Specific plugin version to show", autocompletion=version_autocomplete),
     snapshot: bool = typer.Option(True, help="Show the latest snapshot version"),
     limit: int = typer.Option(5, help="Limit the number of version displayed")
     ):
@@ -95,6 +186,17 @@ def show(
     console.print()
 
     if not version:
+        # If plugin is installed, show the installed version details first
+        if installed_plugin:
+            filename, file_info = installed_plugin
+            # Find the version_id for the installed version
+            installed_version_id = file_info.version_id
+            
+            console.print("[bold cyan]Installed Version Details[/bold cyan]\n")
+            panel = create_version_detail_panel(installed_version_id, file_info)
+            console.print(panel)
+            console.print()
+        
         # Show available versions in a table
         versions_data = []
         i = 0
@@ -110,9 +212,24 @@ def show(
             table = create_version_table(versions_data, f"Available Versions (showing {len(versions_data)})")
             console.print(table)
     else:
+        # Try to find version by version_id first, then by version_name
+        file = None
+        version_id = None
+        
         if version in project.versions:
+            # Direct match by version_id
+            version_id = version
             file = project.versions[version]
-            panel = create_version_detail_panel(version, file)
+        else:
+            # Try to match by version_name
+            for vid, vfile in project.versions.items():
+                if vfile.version_name == version:
+                    version_id = vid
+                    file = vfile
+                    break
+        
+        if file:
+            panel = create_version_detail_panel(version_id, file)
             console.print(panel)
         else:
             print_error(f"Version {version} not found for plugin {project.name}.")
@@ -139,8 +256,8 @@ def server_info(ctx: typer.Context):
 @app.command()
 def install(
     ctx: typer.Context,
-    name: str = typer.Argument(..., help="Name or ID of the plugin to install"),
-    version: Optional[str] = typer.Option(None, help="Specific plugin version to install"),
+    name: str = typer.Argument(..., help="Name or ID of the plugin to install", autocompletion=plugin_name_autocomplete),
+    version: Optional[str] = typer.Option(None, help="Specific plugin version to install", autocompletion=version_autocomplete),
     snapshot: bool = typer.Option(False, help="Install the latest snapshot version"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Automatic yes to prompts"),
     ):
@@ -282,7 +399,7 @@ def update(
 @app.command()
 def rm(
     ctx: typer.Context,
-    name: str = typer.Argument(..., help="Name or ID of the plugin to remove"),
+    name: str = typer.Argument(..., help="Name or ID of the plugin to remove", autocompletion=plugin_name_autocomplete),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
 ):
     """Remove an installed plugin."""
