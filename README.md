@@ -6,10 +6,8 @@ A modern, user-friendly command-line tool for managing PaperMC server plugins. B
 
 - 🔍 **Smart Search**: Search for plugins across Modrinth with fuzzy matching
 - 📦 **Easy Installation**: Install plugins with a single command
-- ⬆️ **Automatic Updates**: Upgrade all outdated plugins with one command
 - ⬇️ **Version Management**: Upgrade, downgrade, or switch between specific versions
 - 💾 **Intelligent Caching**: Fast operations with apt-like cache system
-- 📊 **Beautiful UI**: Rich terminal interface with progress bars, tables, and panels
 - 🔄 **Version Detection**: Automatically detects outdated plugins
 - 📋 **Installation Status**: See which plugins are installed at a glance
 
@@ -33,24 +31,7 @@ pip install papermc-plugin-manager
 Or using uv:
 
 ```bash
-uv pip install papermc-plugin-manager
-```
-
-## Configuration
-
-PPM can be configured using environment variables:
-
-- `PPM_CACHE_FILE` - Custom cache file location (default: `papermc_plugin_manager.yaml`)
-- `PPM_PLUGINS_DIR` - Custom plugins directory (default: `./plugins`)
-- `PPM_USER_AGENT` - Custom User-Agent for API requests
-- `PPM_DEFAULT_PLATFORM` - Default plugin platform (default: `modrinth`)
-
-**Example:**
-
-```bash
-export PPM_PLUGINS_DIR="/opt/papermc/plugins"
-export PPM_CACHE_FILE="/var/cache/ppm.yaml"
-ppm list
+uv tool install papermc-plugin-manager
 ```
 
 ### Shell Completion (Optional)
@@ -391,26 +372,3 @@ Try searching with different terms or use the exact plugin ID:
 ppm search <term>
 ppm show <plugin-id>
 ```
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-[Add your license here]
-
-## Acknowledgments
-
-- Built with [Typer](https://typer.tiangolo.com/) for CLI framework
-- UI powered by [Rich](https://rich.readthedocs.io/)
-- Plugin data from [Modrinth](https://modrinth.com/)
-
-## Roadmap
-
-- [ ] Support for additional plugin sources (Bukkit, Spigot, Hangar)
-- [ ] Plugin dependency resolution
-- [ ] Bulk operations (install multiple plugins)
-- [ ] Plugin configuration management
-- [ ] Backup and restore functionality
-- [ ] Web interface
