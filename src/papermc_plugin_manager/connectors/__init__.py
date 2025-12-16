@@ -1,1 +1,1 @@
-from .modrinth import Modrinth
+from .modrinth import Modrinth as Modrinth

@@ -25,6 +25,23 @@ Or using uv:
 uv pip install papermc-plugin-manager
 ```
 
+## Configuration
+
+PPM can be configured using environment variables:
+
+- `PPM_CACHE_FILE` - Custom cache file location (default: `papermc_plugin_manager.yaml`)
+- `PPM_PLUGINS_DIR` - Custom plugins directory (default: `./plugins`)
+- `PPM_USER_AGENT` - Custom User-Agent for API requests
+- `PPM_DEFAULT_PLATFORM` - Default plugin platform (default: `modrinth`)
+
+**Example:**
+
+```bash
+export PPM_PLUGINS_DIR="/opt/papermc/plugins"
+export PPM_CACHE_FILE="/var/cache/ppm.yaml"
+ppm list
+```
+
 ### Shell Completion (Optional)
 
 Enable tab completion for plugin names and versions:

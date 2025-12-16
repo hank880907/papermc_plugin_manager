@@ -1,11 +1,8 @@
-from ..connector_interface import ConnectorInterface, ProjectInfo, FileInfo
-
-from .modrinth_models import Version, SearchResponse, Project, TeamMember
-
-import requests
-import json
-from typing import Dict, Optional
 from functools import lru_cache
+
+from ..config import Config
+from ..connector_interface import ConnectorInterface, FileInfo, ProjectInfo
+from .modrinth_models import Project, SearchResponse, TeamMember, Version
 
 
 def version_to_file_info(version: Version) -> FileInfo:
@@ -21,20 +18,23 @@ def version_to_file_info(version: Version) -> FileInfo:
         description=version.changelog or "",
     )
 
+
 class Modrinth(ConnectorInterface):
-    
-    API_BASE = "https://api.modrinth.com/v2"
-    HEADERS = {
-        # Modrinth requires a uniquely identifying User-Agent (ideally with contact info)
-        "User-Agent": "hank880907/modrinth-plugin-downloader/0.1 (hank880907@gmail.com)",
-    }
+    API_BASE = Config.MODRINTH_API_BASE
+
+    @property
+    def HEADERS(self):
+        """Get headers with configurable User-Agent."""
+        return {
+            "User-Agent": Config.get_user_agent(),
+        }
 
     def download(self, file: FileInfo, dest: str):
         """Download a file and yield progress information."""
         yield from Version.get(file.version_id).download_primary_file(dest)
 
     @lru_cache(maxsize=128)
-    def query(self, name: str, mc_version: Optional[str] = None, limit: int = 5) -> Dict[str, ProjectInfo]:
+    def query(self, name: str, mc_version: str | None = None, limit: int = 5) -> dict[str, ProjectInfo]:
         facets = []
         facets.append(["categories:paper"])
         facets.append(["project_type:plugin"])
@@ -55,7 +55,7 @@ class Modrinth(ConnectorInterface):
             if member.is_owner:
                 owner = member.user.username
                 break
-        
+
         plugin_info = ProjectInfo(
             name=modrinth_project.title,
             id=modrinth_project.id,
@@ -86,5 +86,5 @@ class Modrinth(ConnectorInterface):
             try:
                 version = Version.get_by_hash(id)
                 return version_to_file_info(version)
-            except Exception as e2:
+            except Exception:
                 raise RuntimeError(f"Failed to get file info for ID {id}: {e}")
