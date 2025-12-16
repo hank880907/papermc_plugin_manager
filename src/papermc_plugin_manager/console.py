@@ -20,6 +20,7 @@ def create_plugin_info_panel(
     latest: str | None,
     latest_release: str | None,
     description: str | None = None,
+    installed_info: str | None = None,
 ) -> Panel:
     """Create a Rich Panel for displaying plugin information."""
     
@@ -30,6 +31,10 @@ def create_plugin_info_panel(
     content.append(f"[cyan]Downloads:[/cyan]       {downloads:,}")
     content.append(f"[cyan]Latest:[/cyan]          {latest if latest else '[dim]N/A[/dim]'}")
     content.append(f"[cyan]Latest Release:[/cyan]  {latest_release if latest_release else '[dim]N/A[/dim]'}")
+    
+    if installed_info:
+        content.append("")
+        content.append(installed_info)
     
     if description:
         content.append("")
@@ -90,7 +95,7 @@ def create_version_table(versions_data: list, title: str = "Available Versions")
     
     table.add_column("Version ID", style="cyan", no_wrap=True)
     table.add_column("Name", style="bold green")
-    table.add_column("Type", style="yellow")
+    table.add_column("Type", style="white")
     table.add_column("Release Date", style="white")
     table.add_column("MC Versions", style="dim")
     
@@ -160,13 +165,14 @@ def create_installed_plugins_table(plugins_data: list) -> Table:
         header_style="bold magenta",
     )
     
-    table.add_column("File", style="bold green")
-    table.add_column("Name", style="cyan")
-    table.add_column("Version", style="yellow")
+    table.add_column("Project", style="bold green")
+    table.add_column("Version Name", style="cyan")
+    table.add_column("Version ID", style="yellow")
     table.add_column("Type", style="white")
     table.add_column("Release Date", style="dim")
+    table.add_column("Status", style="white", justify="center")
     
-    for file_name, file_info in plugins_data:
+    for file_name, file_info, is_outdated, project_name in plugins_data:
         # Style the version type
         version_type = file_info.version_type
         if version_type == "RELEASE":
@@ -176,12 +182,16 @@ def create_installed_plugins_table(plugins_data: list) -> Table:
         else:
             type_display = "[red]●[/red] ALPHA"
         
+        # Status indicator
+        status_display = "[yellow]⚠ Outdated[/yellow]" if is_outdated else "[green]✓ Current[/green]"
+        
         table.add_row(
-            file_name,
+            project_name,
             file_info.version_name,
             file_info.version_id,
             type_display,
             file_info.release_date.strftime('%Y-%m-%d'),
+            status_display,
         )
     
     return table

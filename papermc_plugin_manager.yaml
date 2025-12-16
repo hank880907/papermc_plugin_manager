@@ -1,0 +1,537 @@
+plugins:
+  DistantHorizonsSupport-0.12.0.jar:
+    sha1: 2f3ceb614ef4927cca1b6d61c6e9a59796054253
+    version_id: FC75foTg
+    project_id: IjY7seTG
+    project_name: Distant Horizons Support
+    version_name: 0.12.0
+    version_type: RELEASE
+    release_date: '2025-12-14T17:12:37.473748+00:00'
+    mc_versions:
+    - '1.16'
+    - 1.16.1
+    - 1.16.2
+    - 1.16.3
+    - 1.16.4
+    - 1.16.5
+    - '1.17'
+    - 1.17.1
+    - '1.18'
+    - 1.18.1
+    - 1.18.2
+    - '1.19'
+    - 1.19.1
+    - 1.19.2
+    - 1.19.3
+    - 1.19.4
+    - '1.20'
+    - 1.20.1
+    - 1.20.2
+    - 1.20.3
+    - 1.20.4
+    - 1.20.5
+    - 1.20.6
+    - '1.21'
+    - 1.21.1
+    - 1.21.2
+    - 1.21.3
+    - 1.21.4
+    - 1.21.5
+    - 1.21.6
+    - 1.21.7
+    - 1.21.8
+    - 1.21.9
+    - 1.21.10
+    - 1.21.11
+    url: https://cdn.modrinth.com/data/IjY7seTG/versions/FC75foTg/DistantHorizonsSupport-0.12.0.jar
+    description: "## PSA: This release contains a change to the LOD data format which\
+      \ requires a rebuild of all LODs.\nOld LODs will automatically be deleted and\
+      \ rebuilt when requested, but you can also use the pregen command like normal\
+      \ if you'd like.\n\n**Changed**\n * Log message \"DH config for player\" disabled\n\
+      \ * Named threads (thanks to @SootyOwl)\n\n**Added**\n * Server key feature\
+      \ for servers with multiple addresses\n * Version mismatch message in player\
+      \ chat\n * Support for Distant Horizons 2.4.0\n"
+    hashes:
+      sha1: 2f3ceb614ef4927cca1b6d61c6e9a59796054253
+      sha512: f60a7bb55daf546d55d7d4cbc530e04b31829a3905af4eb79e7c75c7fa949e7ac7a45dd787e60c30bd441e7150bab8925401b21cad9f6fa837f082fdde5ae9bd
+    is_outdated: false
+    last_checked: '2025-12-16T13:25:10.750481'
+  CoreProtect-CE-23.1.jar:
+    sha1: 61782e4f00fcd475c7aa4dca70d23108069f7574
+    version_id: HD2IvrxS
+    project_id: Lu3KuzdV
+    project_name: CoreProtect
+    version_name: '23.1'
+    version_type: RELEASE
+    release_date: '2025-12-14T21:39:54.784540+00:00'
+    mc_versions:
+    - '1.16'
+    - 1.16.1
+    - 1.16.2
+    - 1.16.3
+    - 1.16.4
+    - 1.16.5
+    - '1.17'
+    - 1.17.1
+    - '1.18'
+    - 1.18.1
+    - 1.18.2
+    - '1.19'
+    - 1.19.1
+    - 1.19.2
+    - 1.19.3
+    - 1.19.4
+    - '1.20'
+    - 1.20.1
+    - 1.20.2
+    - 1.20.3
+    - 1.20.4
+    - 1.20.5
+    - 1.20.6
+    - '1.21'
+    - 1.21.1
+    - 1.21.2
+    - 1.21.3
+    - 1.21.4
+    - 1.21.5
+    - 1.21.6
+    - 1.21.7
+    - 1.21.8
+    - 1.21.9
+    - 1.21.10
+    url: https://cdn.modrinth.com/data/Lu3KuzdV/versions/HD2IvrxS/CoreProtect-CE-23.1.jar
+    description: "*If you enjoy using CoreProtect, please consider supporting the\
+      \ project on [Patreon](https://coreprotect.net/patreon/) and joining us on [Discord](https://coreprotect.net/discord/).\
+      \  \n**Patrons receive early access to builds with exclusive functionality**,\
+      \ as well as other exclusive benefits.*\n\n### Changelog\n* Added preliminary\
+      \ support for Minecraft 1.21.10.\n* Added support for MultiPaper servers.\n\
+      * Added support for extended copper chest logging.\n* Adds support for logging\
+      \ enabling/disabling Crafter slots (@stufyerface).\n* Added location information\
+      \ to CoreProtectPreLogEvent API event.\n* Improved & extended localization (@Halogly,\
+      \ @shotadft, @crexlight, @malpkakefirek, @hwangsihu, @JoMiNovi)\n* Fixed startup\
+      \ error on Minecraft versions without minor version information.\n\n\\* _Denotes\
+      \ functionality exclusive for Patreon subscribers._"
+    hashes:
+      sha1: 61782e4f00fcd475c7aa4dca70d23108069f7574
+      sha512: 4bb630965d5af2780bc13b9d3d5e0a5bb2f0245a9d5dedf4a7349e8d997a890ae119fed3b41017787833f39afe03555c271af9f5cfbfaf86588e2f9dc51f39af
+    is_outdated: false
+    last_checked: '2025-12-16T13:25:15.228473'
+  Geyser-Spigot.jar:
+    sha1: 7f5ff5084fa1f48a2902a94fe3a9bac0d18a1e5c
+    version_id: sNyBLTS5
+    project_id: wKkoqHrH
+    project_name: Geyser
+    version_name: 2.9.2-b1006
+    version_type: BETA
+    release_date: '2025-12-13T15:55:05.769614+00:00'
+    mc_versions:
+    - 1.16.5
+    - '1.17'
+    - 1.17.1
+    - '1.18'
+    - 1.18.1
+    - 1.18.2
+    - '1.19'
+    - 1.19.1
+    - 1.19.2
+    - 1.19.3
+    - 1.19.4
+    - '1.20'
+    - 1.20.1
+    - 1.20.2
+    - 1.20.3
+    - 1.20.4
+    - 1.20.5
+    - 1.20.6
+    - '1.21'
+    - 1.21.1
+    - 1.21.2
+    - 1.21.3
+    - 1.21.4
+    - 1.21.5
+    - 1.21.6
+    - 1.21.7
+    - 1.21.8
+    - 1.21.9
+    - 1.21.10
+    url: https://cdn.modrinth.com/data/wKkoqHrH/versions/sNyBLTS5/Geyser-Spigot.jar
+    description: '### [Changes](https://github.com/GeyserMC/Geyser/compare/f67cd24^...f67cd24):
+
+      - [`f67cd24`](https://github.com/GeyserMC/Geyser/commit/f67cd24) Fixed spinnin
+      boat for touch device. \(\#6043\) by @oryxel1
+
+      '
+    hashes:
+      sha1: 7f5ff5084fa1f48a2902a94fe3a9bac0d18a1e5c
+      sha512: 7f288595901d78e1950a48cb466f716a2a50a09bf7412a4838cf58007be5b03084803c2dabe6cf93d93b4385883da272773c7b146544aee7fc5f814d4ba09c97
+    is_outdated: false
+    last_checked: '2025-12-16T13:25:18.158082'
+  vault-1.5.1.jar:
+    sha1: 9335a25e634b4c95e50267c19c2d7c8fc26b4b07
+    version_id: CRBD3Lpq
+    project_id: rj9SgaYL
+    project_name: Vault 2.0 economy plugins
+    version_name: 1.5.1
+    version_type: RELEASE
+    release_date: '2025-12-14T19:39:46.092079+00:00'
+    mc_versions:
+    - '1.8'
+    - 1.8.1
+    - 1.8.2
+    - 1.8.3
+    - 1.8.4
+    - 1.8.5
+    - 1.8.6
+    - 1.8.7
+    - 1.8.8
+    - 1.8.9
+    - '1.9'
+    - 1.9.1
+    - 1.9.2
+    - 1.9.3
+    - 1.9.4
+    - '1.10'
+    - 1.10.1
+    - 1.10.2
+    - '1.11'
+    - 1.11.1
+    - 1.11.2
+    - '1.12'
+    - 1.12.1
+    - 1.12.2
+    - '1.13'
+    - 1.13.1
+    - 1.13.2
+    - '1.14'
+    - 1.14.1
+    - 1.14.2
+    - 1.14.3
+    - 1.14.4
+    - '1.15'
+    - 1.15.1
+    - 1.15.2
+    - '1.16'
+    - 1.16.1
+    - 1.16.2
+    - 1.16.3
+    - 1.16.4
+    - 1.16.5
+    - '1.17'
+    - 1.17.1
+    - '1.18'
+    - 1.18.1
+    - 1.18.2
+    - '1.19'
+    - 1.19.1
+    - 1.19.2
+    - 1.19.3
+    - 1.19.4
+    - '1.20'
+    - 1.20.1
+    - 1.20.2
+    - 1.20.3
+    - 1.20.4
+    - 1.20.5
+    - 1.20.6
+    - '1.21'
+    - 1.21.1
+    - 1.21.2
+    - 1.21.3
+    - 1.21.4
+    - 1.21.5
+    - 1.21.6
+    - 1.21.7
+    - 1.21.8
+    - 1.21.9
+    - 1.21.10
+    url: https://cdn.modrinth.com/data/rj9SgaYL/versions/CRBD3Lpq/vault-1.5.1.jar
+    description: '# New update
+
+
+      Based on user suggestions, the following new features have been implemented:
+
+
+      - Ability to change the colors of names and menu items.'
+    hashes:
+      sha1: 9335a25e634b4c95e50267c19c2d7c8fc26b4b07
+      sha512: d66afed213cadd96356106522b17cec895894193564de9f657dfcf3c30d448f23893e243ff1b2f8fa0fc96043d5209b3904fbe7f84050150d883e2e4f3bb1a8a
+    is_outdated: false
+    last_checked: '2025-12-16T13:25:20.183605'
+  LuckPerms-Bukkit-5.5.17.jar:
+    sha1: af24a4fc61c4ae814ce9a280179b9c88ec614013
+    version_id: OrIs0S6b
+    project_id: Vebnzrzj
+    project_name: LuckPerms
+    version_name: v5.5.17-bukkit
+    version_type: RELEASE
+    release_date: '2025-10-11T12:26:55.608887+00:00'
+    mc_versions:
+    - 1.8.9
+    - '1.9'
+    - 1.9.1
+    - 1.9.2
+    - 1.9.3
+    - 1.9.4
+    - '1.10'
+    - 1.10.1
+    - 1.10.2
+    - '1.11'
+    - 1.11.1
+    - 1.11.2
+    - '1.12'
+    - 1.12.1
+    - 1.12.2
+    - '1.13'
+    - 1.13.1
+    - 1.13.2
+    - '1.14'
+    - 1.14.1
+    - 1.14.2
+    - 1.14.3
+    - 1.14.4
+    - '1.15'
+    - 1.15.1
+    - 1.15.2
+    - '1.16'
+    - 1.16.1
+    - 1.16.2
+    - 1.16.3
+    - 1.16.4
+    - 1.16.5
+    - '1.17'
+    - 1.17.1
+    - '1.18'
+    - 1.18.1
+    - 1.18.2
+    - '1.19'
+    - 1.19.1
+    - 1.19.2
+    - 1.19.3
+    - 1.19.4
+    - '1.20'
+    - 1.20.1
+    - 1.20.2
+    - 1.20.3
+    - 1.20.4
+    - 1.20.5
+    - 1.20.6
+    - '1.21'
+    - 1.21.1
+    - 1.21.2
+    - 1.21.3
+    - 1.21.4
+    - 1.21.5
+    - 1.21.6
+    - 1.21.7
+    - 1.21.8
+    - 1.21.9
+    - 1.21.10
+    url: https://cdn.modrinth.com/data/Vebnzrzj/versions/OrIs0S6b/LuckPerms-Bukkit-5.5.17.jar
+    description: This update brings the latest version of LuckPerms to Modrinth. The
+      full changelog can be viewed at https://luckperms.net/download.
+    hashes:
+      sha1: af24a4fc61c4ae814ce9a280179b9c88ec614013
+      sha512: 773895644260b338818bfeff0c78f8d4f590f56b0f711c378a4eec91be6e8b37354099b5db1ea5b2dce4c02486213297a6da09675c9bf6f014f9a400b5772cf3
+    is_outdated: false
+    last_checked: '2025-12-16T13:25:25.906171'
+  placeholder-plugin.jar:
+    sha1: a572495385153192b2f1c114a73ab112ce556533
+    version_id: YxPHVg9n
+    project_id: U1XWdWNx
+    project_name: Placeholder Plugin
+    version_name: 0.0.1-dev.b123c21
+    version_type: BETA
+    release_date: '2025-12-09T18:04:41.305355+00:00'
+    mc_versions:
+    - '1.20'
+    - 1.20.1
+    - 1.20.2
+    - 1.20.3
+    - 1.20.4
+    - 1.20.5
+    - 1.20.6
+    - '1.21'
+    - 1.21.1
+    - 1.21.2
+    - 1.21.3
+    - 1.21.4
+    - 1.21.5
+    - 1.21.6
+    - 1.21.7
+    - 1.21.8
+    - 1.21.9
+    - 1.21.10
+    - 1.21.11
+    url: https://cdn.modrinth.com/data/U1XWdWNx/versions/YxPHVg9n/placeholder-plugin.jar
+    description: https://docs.simplecloud.app/changelog
+    hashes:
+      sha1: a572495385153192b2f1c114a73ab112ce556533
+      sha512: 6c8ca356d7c59ebb780a2949adfb8502eacaa487a661c3e348417cd62e3916de9e543dbb488f288dc4346621c5b414df7d93c330be9e7bd04c39f566a0b53445
+    is_outdated: false
+    last_checked: '2025-12-16T13:25:12.908189'
+  ViaVersion-5.6.0.jar:
+    sha1: 9680c152b07ee9f7053f3e2ae572338ace2d2b1a
+    version_id: wJ7j2lM6
+    project_id: P1OZGk5p
+    project_name: ViaVersion
+    version_name: 5.6.0
+    version_type: RELEASE
+    release_date: '2025-12-12T15:03:02.546533+00:00'
+    mc_versions:
+    - 1.8.9
+    - '1.9'
+    - 1.9.1
+    - 1.9.2
+    - 1.9.3
+    - 1.9.4
+    - '1.10'
+    - 1.10.1
+    - 1.10.2
+    - '1.11'
+    - 1.11.1
+    - 1.11.2
+    - '1.12'
+    - 1.12.1
+    - 1.12.2
+    - '1.13'
+    - 1.13.1
+    - 1.13.2
+    - '1.14'
+    - 1.14.1
+    - 1.14.2
+    - 1.14.3
+    - 1.14.4
+    - '1.15'
+    - 1.15.1
+    - 1.15.2
+    - '1.16'
+    - 1.16.1
+    - 1.16.2
+    - 1.16.3
+    - 1.16.4
+    - 1.16.5
+    - '1.17'
+    - 1.17.1
+    - '1.18'
+    - 1.18.1
+    - 1.18.2
+    - '1.19'
+    - 1.19.1
+    - 1.19.2
+    - 1.19.3
+    - 1.19.4
+    - '1.20'
+    - 1.20.1
+    - 1.20.2
+    - 1.20.3
+    - 1.20.4
+    - 1.20.5
+    - 1.20.6
+    - '1.21'
+    - 1.21.1
+    - 1.21.2
+    - 1.21.3
+    - 1.21.4
+    - 1.21.5
+    - 1.21.6
+    - 1.21.7
+    - 1.21.8
+    - 1.21.9
+    - 1.21.10
+    - 1.21.11
+    url: https://cdn.modrinth.com/data/P1OZGk5p/versions/wJ7j2lM6/ViaVersion-5.6.0.jar
+    description: '1.21.11 client support.
+
+      - Implemented most remaining item data hashing to fix desyncs on item drags
+      (by kennytv and EnZaXD)
+
+      - Fixed missing conversion of entities enchantment predicates in registry data
+
+      - Fixed entity_data and block_entity_data roundtrip handling in 1.21.9->1.21.7
+      (by Lumine1909)
+
+      - Strip trailing spaces in cut player messages in 1.10->1.11 (by EnZaXD)
+
+      - Fixed an error in ViaVersion''s error handling (by EnZaXD)
+
+
+      If you want to get larger version updates early, consider supporting me via
+      https://viaversion.com/donate. See the [previous update notes](https://github.com/ViaVersion/ViaVersion/releases/tag/4.9.3)
+      for more info.'
+    hashes:
+      sha1: 9680c152b07ee9f7053f3e2ae572338ace2d2b1a
+      sha512: e0c8f7b1c9db2954ee85d0f823f670a29b14af5098b969bb5e8046b931e81346449da0c38513ae0d0418b53da84af6969a2fda8c52e56779710519296d7f6146
+    is_outdated: false
+    last_checked: '2025-12-16T13:25:23.516017'
+projects:
+  IjY7seTG:
+    name: Distant Horizons Support
+    id: IjY7seTG
+    author: jckf
+    description: Add support for Distant Horizons to your Bukkit compatible server.
+    downloads: 10483
+    latest: FC75foTg
+    latest_release: FC75foTg
+    last_checked: '2025-12-16T13:25:10.750426'
+  Lu3KuzdV:
+    name: CoreProtect
+    id: Lu3KuzdV
+    author: Intelli
+    description: CoreProtect is a fast, efficient, data logging and anti-griefing
+      tool. Rollback and restore any amount of damage. Designed with large servers
+      in mind, CoreProtect will record and manage data without impacting your server
+      performance.
+    downloads: 260366
+    latest: HD2IvrxS
+    latest_release: HD2IvrxS
+    last_checked: '2025-12-16T13:25:15.228388'
+  wKkoqHrH:
+    name: Geyser
+    id: wKkoqHrH
+    author: Unknown
+    description: 'A bridge/proxy allowing you to connect to Minecraft: Java Edition
+      servers with Minecraft: Bedrock Edition.'
+    downloads: 501329
+    latest: sNyBLTS5
+    latest_release: null
+    last_checked: '2025-12-16T13:25:18.158062'
+  P1OZGk5p:
+    name: ViaVersion
+    id: P1OZGk5p
+    author: kennytv
+    description: Allow newer Java Edition clients to connect to older servers.
+    downloads: 1261806
+    latest: 5qmxK6J7
+    latest_release: wJ7j2lM6
+    last_checked: '2025-12-16T13:25:23.515994'
+  rj9SgaYL:
+    name: Vault 2.0 economy plugins
+    id: rj9SgaYL
+    author: Aerials
+    description: vault2.0 is an improved economy plugin that does not require Vault
+      1.7.3, as it comes pre-installed and adds new features that improve the use
+      of the server economy.
+    downloads: 127
+    latest: CRBD3Lpq
+    latest_release: CRBD3Lpq
+    last_checked: '2025-12-16T13:25:20.183555'
+  Vebnzrzj:
+    name: LuckPerms
+    id: Vebnzrzj
+    author: lucko
+    description: A permissions plugin/mod for Minecraft servers.
+    downloads: 1210521
+    latest: OrIs0S6b
+    latest_release: OrIs0S6b
+    last_checked: '2025-12-16T13:25:25.906120'
+  U1XWdWNx:
+    name: Placeholder Plugin
+    id: U1XWdWNx
+    author: Unknown
+    description: The placeholder plugin allows you to use all important parameters
+      of the SimpleCloud Controller API as placeholders with the help of the PlaceholderAPI.
+      This allows you to retrieve all information about a server or group as a placeholder.
+    downloads: 10122
+    latest: YxPHVg9n
+    latest_release: null
+    last_checked: '2025-12-16T13:25:12.908137'

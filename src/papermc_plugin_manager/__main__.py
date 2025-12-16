@@ -5,7 +5,7 @@ from papermc_plugin_manager.connector_interface import get_connector, CliContext
 from pathlib import Path
 from requests import HTTPError
 
-from .utils import get_papermc_version, get_sha1
+from .utils import get_papermc_version
 from .plugin_manager import PluginManager
 from .connector_interface import ProjectInfo, FileInfo
 from .console import (
@@ -51,7 +51,7 @@ def show(
     snapshot: bool = typer.Option(True, help="Show the latest snapshot version"),
     limit: int = typer.Option(5, help="Limit the number of version displayed")
     ):
-    """Display information about the current PaperMC server version."""
+    """Display information about a plugin."""
     cli_ctx: CliContext = ctx.obj
     connector = cli_ctx.connector
     manager = PluginManager(connector, cli_ctx.game_version)
@@ -60,6 +60,15 @@ def show(
         print_error(f"Plugin {name} not found.")
         raise typer.Exit(code=1)
     is_exact_match, project = result
+    
+    # Check if plugin is installed
+    installed_plugin = manager.get_installed_plugin_by_project_id(project.id)
+    installed_info = None
+    if installed_plugin:
+        filename, file_info = installed_plugin
+        installed_info = f"[green]✓ Installed:[/green] {file_info.version_name} [dim]({filename})[/dim]"
+    else:
+        installed_info = "[dim]Not installed[/dim]"
     
     # Display project info in a panel
     panel = create_plugin_info_panel(
@@ -70,6 +79,7 @@ def show(
         latest=project.latest,
         latest_release=project.latest_release,
         description=project.description,
+        installed_info=installed_info,
     )
     console.print(panel)
     console.print()
@@ -122,7 +132,6 @@ def install(
     name: str = typer.Argument(..., help="Name or ID of the plugin to install"),
     version: Optional[str] = typer.Option(None, help="Specific plugin version to install"),
     snapshot: bool = typer.Option(False, help="Install the latest snapshot version"),
-    platform: str = typer.Option(DEFAULT_PLATFORM, help="Plugin platform to query"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Automatic yes to prompts"),
     ):
     
@@ -143,12 +152,28 @@ def install(
         typer.confirm(f"Do you want to install {project.name}?", abort=True)
 
     target: str = ""
-    if snapshot and project.latest:
-        target = project.latest
-    elif project.latest_release:
-        target = project.latest_release
-    elif project.latest:
-        target = project.latest
+    if version:
+        if version in project.versions:
+            target = version
+        else:
+            # Check if version matches any FileInfo.version_name
+            matched_version_id = None
+            for version_id, file_info in project.versions.items():
+                if file_info.version_name == version:
+                    matched_version_id = version_id
+                    break
+            if matched_version_id:
+                target = matched_version_id
+            else:
+                print_error(f"Version {version} not found for plugin {project.name}.")
+                raise typer.Exit(code=1)
+    else:
+        if snapshot and project.latest:
+            target = project.latest
+        elif project.latest_release:
+            target = project.latest_release
+        elif project.latest:
+            target = project.latest
 
     if target:
         file = project.versions[target]
@@ -157,6 +182,9 @@ def install(
         # Download with progress bar
         from rich.progress import Progress, BarColumn, DownloadColumn, TransferSpeedColumn, TimeRemainingColumn
         
+        downloaded = False
+        # Allow downgrade when user specifies a specific version
+        allow_replace = version is not None
         with Progress(
             "[progress.description]{task.description}",
             BarColumn(),
@@ -166,40 +194,167 @@ def install(
             console=console,
         ) as progress:
             task = None
-            for bytes_downloaded, total_size, chunk, filename in manager.install_plugin(file):
+            for bytes_downloaded, total_size, chunk, filename in manager.install_plugin(file, allow_replace=allow_replace):
+                downloaded = True
                 if task is None:
                     task = progress.add_task(f"[cyan]Downloading {filename}...", total=total_size)
                 progress.update(task, completed=bytes_downloaded)
         
-        print_success("Installation complete!")
+        if downloaded:
+            print_success("Installation complete!")
     else:
         print_error("No available versions to install.")
         raise typer.Exit(code=1)
 
 
-@app.command()
-def status(
+@app.command(name="list")
+def list_plugins(
     ctx: typer.Context,
-    platform: str = typer.Option(DEFAULT_PLATFORM, help="Plugin platform to query"),):
+    platform: str = typer.Option(DEFAULT_PLATFORM, help="Plugin platform to query"),
+):
+    """List all installed plugins."""
     connector = get_connector(platform)
-    files = os.listdir("./plugins")
+    manager = PluginManager(connector, ctx.obj.game_version)
     
-    plugins_data = []
-    for file in files:
-        path = Path("./plugins") / file
-        if path.is_file():
-            sha1 = get_sha1(path)
-            try:
-                file_info = connector.get_file_info(sha1)
-                plugins_data.append((file, file_info))
-            except Exception as e:
-                print_warning(f"Could not fetch info for {file}: {e}")
+    with console.status("[bold green]Scanning plugins...") as status:
+        plugins_data = manager.get_installed_plugins(
+            plugins_dir="./plugins",
+            force_refresh=False,
+            status_callback=status.update
+        )
     
+    console.print()  # Add blank line before table
     if plugins_data:
         table = create_installed_plugins_table(plugins_data)
         console.print(table)
     else:
         print_warning("No plugins found in ./plugins directory.")
+
+
+@app.command()
+def update(
+    ctx: typer.Context,
+    platform: str = typer.Option(DEFAULT_PLATFORM, help="Plugin platform to query"),
+):
+    """Update the plugin cache with latest version information."""
+    connector = get_connector(platform)
+    manager = PluginManager(connector, ctx.obj.game_version)
+    
+    print_info("Updating plugin cache...")
+    
+    with console.status("[bold green]Fetching plugin information...") as status:
+        plugins_data = manager.get_installed_plugins(
+            plugins_dir="./plugins",
+            force_refresh=True,
+            status_callback=status.update
+        )
+    
+    console.print()
+    if plugins_data:
+        outdated_count = sum(1 for _, _, is_outdated, _ in plugins_data if is_outdated)
+        print_success(f"Cache updated. Found {len(plugins_data)} plugin(s).")
+        if outdated_count > 0:
+            print_info(f"{outdated_count} plugin(s) can be upgraded. Run 'ppm upgrade' to upgrade them.")
+    else:
+        print_warning("No plugins found.")
+
+
+@app.command()
+def upgrade(
+    ctx: typer.Context,
+    platform: str = typer.Option(DEFAULT_PLATFORM, help="Plugin platform to query"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Automatic yes to prompts"),
+):
+    """Upgrade all outdated plugins to their latest versions."""
+    connector = get_connector(platform)
+    manager = PluginManager(connector, ctx.obj.game_version)
+    
+    # Get installed plugins with their status (from cache)
+    with console.status("[bold green]Checking for outdated plugins...") as status:
+        plugins_data = manager.get_installed_plugins(
+            plugins_dir="./plugins",
+            force_refresh=False,  # Use cache only, like apt
+            status_callback=status.update
+        )
+    
+    # Filter outdated plugins
+    outdated_plugins = [(filename, file_info, project_name) for filename, file_info, is_outdated, project_name in plugins_data if is_outdated]
+    
+    if not outdated_plugins:
+        print_success("All plugins are up to date!")
+        return
+    
+    # Show what will be upgraded
+    console.print(f"\n[bold yellow]Found {len(outdated_plugins)} outdated plugin(s):[/bold yellow]\n")
+    for filename, file_info, project_name in outdated_plugins:
+        console.print(f"  • [cyan]{project_name}[/cyan] [dim]({filename})[/dim]")
+        console.print(f"    Current: {file_info.version_name}")
+    
+    console.print()
+    
+    if not yes:
+        if not typer.confirm("Do you want to upgrade these plugins?"):
+            print_warning("Upgrade cancelled.")
+            return
+    
+    # Upgrade each outdated plugin
+    upgraded_count = 0
+    failed_count = 0
+    
+    for filename, file_info, project_name in outdated_plugins:
+        try:
+            console.print(f"\n[bold cyan]Upgrading {project_name}...[/bold cyan]")
+            
+            # Get project info to find latest version
+            project_info = connector.get_project_info(file_info.project_id)
+            
+            # Find latest version of same type
+            latest_version_id = None
+            if file_info.version_type == "RELEASE" and project_info.latest_release:
+                latest_version_id = project_info.latest_release
+            elif file_info.version_type in ["BETA", "ALPHA"] and project_info.latest:
+                latest_version_id = project_info.latest
+            
+            if not latest_version_id or latest_version_id not in project_info.versions:
+                print_error(f"Could not find latest version for {project_name}")
+                failed_count += 1
+                continue
+            
+            latest_file = project_info.versions[latest_version_id]
+            
+            # Download with progress bar
+            from rich.progress import Progress, BarColumn, DownloadColumn, TransferSpeedColumn, TimeRemainingColumn
+            
+            downloaded = False
+            with Progress(
+                "[progress.description]{task.description}",
+                BarColumn(),
+                DownloadColumn(),
+                TransferSpeedColumn(),
+                TimeRemainingColumn(),
+                console=console,
+            ) as progress:
+                task = None
+                for bytes_downloaded, total_size, chunk, download_filename in manager.upgrade_plugin(latest_file):
+                    downloaded = True
+                    if task is None:
+                        task = progress.add_task(f"[cyan]Downloading {download_filename}...", total=total_size)
+                    progress.update(task, completed=bytes_downloaded)
+            
+            if downloaded:
+                print_success(f"Upgraded {project_name} to {latest_file.version_name}")
+                upgraded_count += 1
+            
+        except Exception as e:
+            print_error(f"Failed to upgrade {project_name}: {e}")
+            failed_count += 1
+    
+    # Summary
+    console.print()
+    if upgraded_count > 0:
+        print_success(f"Successfully upgraded {upgraded_count} plugin(s)")
+    if failed_count > 0:
+        print_warning(f"Failed to upgrade {failed_count} plugin(s)")
 
 
 @app.callback()
@@ -219,8 +374,6 @@ def initialize_cli(ctx: typer.Context,
         default_platform=platform,
         connector=get_connector(platform),
     )
-    
-    
 
 
 def main():
