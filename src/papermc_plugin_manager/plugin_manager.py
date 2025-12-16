@@ -81,6 +81,21 @@ class PluginManager:
 
     def _cache_project_info(self, project_id: str, project_info: ProjectInfo) -> dict:
         """Create cache entry for a project."""
+        # Serialize versions dict
+        versions_cache = {}
+        for version_id, file_info in project_info.versions.items():
+            versions_cache[version_id] = {
+                'version_id': file_info.version_id,
+                'project_id': file_info.project_id,
+                'version_name': file_info.version_name,
+                'version_type': file_info.version_type,
+                'release_date': file_info.release_date.isoformat(),
+                'mc_versions': file_info.mc_versions,
+                'url': file_info.url,
+                'description': file_info.description,
+                'hashes': file_info.hashes,
+            }
+        
         return {
             'name': project_info.name,
             'id': project_info.id,
@@ -89,6 +104,7 @@ class PluginManager:
             'downloads': project_info.downloads,
             'latest': project_info.latest,
             'latest_release': project_info.latest_release,
+            'versions': versions_cache,
             'last_checked': datetime.now().isoformat(),
         }
 
@@ -117,27 +133,59 @@ class PluginManager:
     def fuzzy_find_project(self, name: str) -> Tuple[bool, ProjectInfo] | None:
         """Fuzzy find a project by its name or ID.
         
-        First checks local cache, then queries the connector.
+        First checks local cache (by ID and name), then queries the connector.
         returns a tuple (is_exact_match, ProjectInfo) if found, else None.
         """
+        def reconstruct_project_from_cache(cached_project: dict) -> ProjectInfo:
+            """Helper to reconstruct ProjectInfo from cache entry."""
+            # Reconstruct versions dict
+            versions = {}
+            for version_id, version_data in cached_project.get('versions', {}).items():
+                versions[version_id] = FileInfo(
+                    version_id=version_data['version_id'],
+                    project_id=version_data['project_id'],
+                    version_name=version_data['version_name'],
+                    version_type=version_data['version_type'],
+                    release_date=datetime.fromisoformat(version_data['release_date']),
+                    mc_versions=version_data['mc_versions'],
+                    hashes=version_data['hashes'],
+                    url=version_data['url'],
+                    description=version_data.get('description', ''),
+                )
+            
+            return ProjectInfo(
+                name=cached_project['name'],
+                id=cached_project['id'],
+                author=cached_project['author'],
+                description=cached_project.get('description', ''),
+                downloads=cached_project.get('downloads', 0),
+                latest=cached_project.get('latest'),
+                latest_release=cached_project.get('latest_release'),
+                versions=versions,
+            )
+        
         # First try to find in cache by project_id
         if name in self.cache.get('projects', {}):
             console.print(f"[dim]Found {name} in cache[/dim]")
             try:
                 cached_project = self.cache['projects'][name]
-                project_info = ProjectInfo(
-                    name=cached_project['name'],
-                    id=cached_project['id'],
-                    author=cached_project['author'],
-                    description=cached_project.get('description', ''),
-                    downloads=cached_project.get('downloads', 0),
-                    latest=cached_project.get('latest'),
-                    latest_release=cached_project.get('latest_release'),
-                )
+                project_info = reconstruct_project_from_cache(cached_project)
                 return True, project_info
             except Exception:
                 # Cache corrupted, fall through to network lookup
                 pass
+        
+        # Try to find in cache by project name (case-insensitive)
+        name_lower = name.lower()
+        for project_id, cached_project in self.cache.get('projects', {}).items():
+            try:
+                if cached_project.get('name', '').lower() == name_lower:
+                    console.print(f"[dim]Found {name} in cache (by name)[/dim]")
+                    project_info = reconstruct_project_from_cache(cached_project)
+                    return True, project_info
+            except Exception:
+                # Skip corrupted cache entry
+                continue
 
         try:
             result = self.connector.get_project_info(name)

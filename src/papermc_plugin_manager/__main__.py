@@ -70,14 +70,23 @@ def show(
     else:
         installed_info = "[dim]Not installed[/dim]"
     
+    # Convert version IDs to version names
+    latest_name = None
+    if project.latest and project.latest in project.versions:
+        latest_name = project.versions[project.latest].version_name
+    
+    latest_release_name = None
+    if project.latest_release and project.latest_release in project.versions:
+        latest_release_name = project.versions[project.latest_release].version_name
+    
     # Display project info in a panel
     panel = create_plugin_info_panel(
         name=project.name,
         id=project.id,
         author=project.author,
         downloads=project.downloads,
-        latest=project.latest,
-        latest_release=project.latest_release,
+        latest=latest_name,
+        latest_release=latest_release_name,
         description=project.description,
         installed_info=installed_info,
     )
