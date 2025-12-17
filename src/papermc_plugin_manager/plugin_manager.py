@@ -29,6 +29,15 @@ class PluginManager:
         plugin_files = glob.glob(os.path.join(self.plugin_dir, "*.jar"))
         return plugin_files
     
+    def needs_update(self) -> bool:
+        """check if plugin manager needs to update installed plugins."""
+        installed_plugins = self.get_installed_plugins_filename()
+        for plugin in installed_plugins:
+            sha1 = compute_sha1(plugin)
+            if not self.db.is_sha1_known(sha1):
+                return True
+        return False
+    
     def update(self, default_source: str):
         # get the installed plugins and their hashes.
         plugins = self.get_installed_plugins_filename()
@@ -37,7 +46,7 @@ class PluginManager:
             sha1 = compute_sha1(plugin)
             filesize = Path(plugin).stat().st_size
             logger.debug(f"Plugin: {plugin}, SHA1: {sha1}")
-            self.db.save_installation_info(plugin, sha1, filesize)
+            self.db.save_installation_info(os.path.basename(plugin), sha1, filesize)
             plugin_hashes.append(sha1)
         # remove stale installations
         self.db.remove_stale_installations(plugin_hashes)
@@ -79,6 +88,14 @@ class PluginManager:
             project.current_version = self.db.get_file_by_sha1(installation.sha1)
             projects.append(project)
         return projects, unrecognized
+    
+    def get_installation_names(self) -> List[str]:
+        """Get a list of installed plugin names for autocompletion."""
+        installations, _ = self.get_installations()
+        return [plugin.name for plugin in installations] + [plugin.project_id for plugin in installations]
+    
+    def get_project_info(self, name):
+        return self.db.get_project_info(name)
 
 
 def get_plugin_manager() -> PluginManager:

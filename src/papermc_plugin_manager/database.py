@@ -74,7 +74,6 @@ class ProjectTable(Base):
 
     @classmethod
     def from_project_info(cls, info: ProjectInfo):
-        print(info)
         return ProjectTable(
             source=info.source,
             project_id=info.project_id,
@@ -154,12 +153,24 @@ class SourceDatabase:
         files = self.get_all_files(project_table.project_id)
         return project_table.to_project_info(files)
 
-    def get_project(self, name: str) -> ProjectInfo | None:
+    def get_project_info(self, name: str) -> ProjectInfo | None:
         project_table = self.get_project_table(name)
         if project_table is None:
             return None
         files = self.get_all_files(project_table.project_id)
-        return project_table.to_project_info(files)
+        project_info = project_table.to_project_info(files)
+        with Session(self.engine) as session:
+            stmt = (
+                select(InstallationTable.sha1)
+                .join(FileTable, InstallationTable.sha1 == FileTable.sha1)
+                .where(
+                    FileTable.project_id == project_table.project_id,      # your subset condition(s)
+                ).distinct()
+            )
+            installation_sha1 = session.scalars(stmt).one_or_none()
+            if installation_sha1:
+                project_info.current_version = self.get_file_by_sha1(installation_sha1).to_file_info()
+        return project_info
 
     def save_project_info(self, info: ProjectInfo):
         with Session(self.engine) as session:
@@ -216,3 +227,15 @@ class SourceDatabase:
             stmt = select(InstallationTable)
             installations = session.execute(stmt).scalars().all()
             return installations
+        
+    def get_installation_by_sha1(self, sha1: str) -> InstallationTable | None:
+        with Session(self.engine) as session:
+            stmt = select(InstallationTable).where(InstallationTable.sha1 == sha1)
+            installation = session.execute(stmt).scalar_one_or_none()
+            return installation
+        
+    def is_sha1_known(self, sha1: str) -> bool:
+        with Session(self.engine) as session:
+            stmt = select(InstallationTable).where(InstallationTable.sha1 == sha1)
+            installation = session.execute(stmt).scalar_one_or_none()
+            return installation is not None

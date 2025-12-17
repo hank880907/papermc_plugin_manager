@@ -10,47 +10,168 @@ from .connector_interface import ProjectInfo, FileInfo
 from .database import InstallationTable
 
 # Create a global console instance
-console = Console()
+
+class PpmConsole(Console):
+    """Custom Rich Console for PaperMC Plugin Manager."""
+
+    def __init__(self):
+        super().__init__()
+
+    def print_success(self, message: str):
+        """Print a success message."""
+        self.print(f"[green]✓[/green] {message}")
 
 
-def create_plugin_info_panel(
-    name: str,
-    id: str,
-    author: str,
-    downloads: int,
-    latest: str | None,
-    latest_release: str | None,
-    description: str | None = None,
-    installed_info: str | None = None,
-    compatibility_info: str | None = None,
-) -> Panel:
-    """Create a Rich Panel for displaying plugin information."""
+    def print_error(self, message: str):
+        """Print an error message."""
+        self.print(f"[red]✗[/red] {message}", style="red")
 
-    # Create the content with aligned labels
-    content = []
-    content.append(f"[cyan]ID:[/cyan]              {id}")
-    content.append(f"[cyan]Author:[/cyan]          {author}")
-    content.append(f"[cyan]Downloads:[/cyan]       {downloads:,}")
-    content.append(f"[cyan]Latest:[/cyan]          {latest if latest else '[dim]N/A[/dim]'}")
-    content.append(f"[cyan]Latest Release:[/cyan]  {latest_release if latest_release else '[dim]N/A[/dim]'}")
 
-    if installed_info:
+    def print_warning(self, message: str):
+        """Print a warning message."""
+        self.print(f"[yellow]⚠[/yellow] {message}", style="yellow")
+
+    def print_info(self, message: str):
+        """Print an info message."""
+        self.print(f"[cyan]ℹ[/cyan] {message}")
+
+    def print_project_info_panel(
+        self,
+        info: ProjectInfo,
+        filename: str | None = None,
+        game_version: str | None = None,
+    ) -> Panel:
+        """Create a Rich Panel for displaying plugin information."""
+
+        name = info.name
+        id = info.project_id
+        author = info.author
+        downloads = info.downloads
+        latest = info.get_latest().version_name if info.get_latest() else None
+        latest_release = info.get_latest_type("release").version_name if info.get_latest_type("release") else None
+        description = info.description
+
+        # Create the content with aligned labels
+        content = []
+        content.append(f"[cyan]ID:[/cyan]              {id}")
+        content.append(f"[cyan]Author:[/cyan]          {author}")
+        content.append(f"[cyan]Downloads:[/cyan]       {downloads:,}")
+        content.append(f"[cyan]Latest:[/cyan]          {latest if latest else '[dim]N/A[/dim]'}")
+        content.append(f"[cyan]Latest Release:[/cyan]  {latest_release if latest_release else '[dim]N/A[/dim]'}")
+
         content.append("")
-        content.append(installed_info)
-        if compatibility_info:
-            content.append(compatibility_info)
+        if info.current_version:
+            content.append(f"[green]✓ Installed:[/green] {info.current_version.version_name} [dim]({filename})[/dim]")
+            content.append(get_compatibility_info(game_version, info.current_version.game_versions, full=True))
+        else:
+            content.append(f"[dim]Not installed[/dim]")
 
-    if description:
-        content.append("")
-        content.append("[yellow]Description:[/yellow]")
-        content.append(description)
+        if description:
+            content.append("")
+            content.append("[yellow]Description:[/yellow]")
+            content.append(description)
 
-    return Panel(
-        "\n".join(content),
-        title=f"[bold green]{name}[/bold green]",
-        border_style="green",
-        box=box.ROUNDED,
-    )
+        self.print(
+            Panel(
+                "\n".join(content),
+                title=f"[bold green]{name}[/bold green]",
+                border_style="green",
+                box=box.ROUNDED,
+                title_align="left",
+            )
+        )
+
+    def print_installed_plugins_table(self, projects: List[ProjectInfo], game_version: str = None) -> Table:
+        """Create a Rich Table for displaying installed plugin status."""
+
+        table = Table(
+            title=f"[bold cyan]{len(projects)} Plugins Installed[/bold cyan]",
+            box=box.ROUNDED,
+            show_header=True,
+            header_style="bold magenta",
+        )
+
+        table.add_column("ID", style="dim", width=10)
+        table.add_column("Plugin", style="bold green")
+        table.add_column("Version", style="cyan")
+        table.add_column("Type", style="white")
+        table.add_column("Date", style="dim")
+        table.add_column("Status", style="white", justify="center")
+
+        # for _file_name, file_info, is_outdated, project_name, project_id, latest_version in plugins_data:
+        for project in projects:
+            # Style the version type
+            file_info = project.current_version
+            if file_info is None:
+                continue
+            latest = project.get_latest_type(file_info.version_type)
+            is_outdated = latest.version_id != file_info.version_id
+            project_name = project.name
+            project_id = project.project_id
+            latest_version = project.get_latest_type(file_info.version_type).version_name
+            version_type = file_info.version_type
+            if version_type == "RELEASE":
+                type_display = "[green]●[/green] RELEASE"
+            elif version_type == "BETA":
+                type_display = "[yellow]●[/yellow] BETA"
+            else:
+                type_display = "[red]●[/red] ALPHA"
+
+            compatibility_icon = get_compatibility_info(game_version, file_info.game_versions)
+            # Add compatibility icon to version name
+            version_display = f"{compatibility_icon} {file_info.version_name}"
+
+            # Status indicator - show latest version if outdated
+            if is_outdated and latest_version:
+                status_display = f"[yellow]⚠ {latest_version}[/yellow]"
+            else:
+                status_display = "[green]✓ up-to-date[/green]"
+
+            table.add_row(
+                project_id,
+                project_name,
+                version_display,
+                type_display,
+                file_info.release_date.strftime("%Y-%m-%d"),
+                status_display,
+            )
+        self.print(table)
+
+    def print_unidentified_plugins_table(self, unidentified_data: List[InstallationTable]) -> Table:
+        """Create a Rich Table for displaying unidentified/unrecognized plugins."""
+
+        table = Table(
+            title="[bold yellow]Unidentified Plugins[/bold yellow]",
+            box=box.ROUNDED,
+            show_header=True,
+            header_style="bold magenta",
+        )
+
+        table.add_column("File Name", style="bold yellow")
+        table.add_column("SHA1", style="dim")
+        table.add_column("Size", style="cyan", justify="right")
+
+        # for filename, sha1, file_size in unidentified_data:
+        for installation in unidentified_data:
+            filename = installation.filename
+            sha1 = installation.sha1
+            file_size = installation.filesize
+            # Format file size
+            if file_size < 1024:
+                size_str = f"{file_size} B"
+            elif file_size < 1024 * 1024:
+                size_str = f"{file_size / 1024:.1f} KB"
+            else:
+                size_str = f"{file_size / (1024 * 1024):.1f} MB"
+
+            table.add_row(
+                filename,
+                sha1[:16] + "...",  # Truncate SHA1 for display
+                size_str,
+            )
+        self.print(table)
+    
+console = PpmConsole()
 
 
 def create_search_results_table(results: dict) -> Table:
@@ -119,32 +240,7 @@ def create_version_table(versions_data: list, title: str = "Available Versions",
             type_style = "[red]●[/red] ALPHA"
 
         # Check compatibility with game version
-        compatibility_icon = ""
-        if game_version and file_info.mc_versions:
-            # Parse game version into parts
-            game_parts = game_version.split(".")
-
-            # Check each supported version for best match
-            best_match = 0  # 0 = no match, 2 = two digits, 3 = three digits
-            for mc_version in file_info.mc_versions:
-                mc_parts = mc_version.split(".")
-
-                # Check for three-digit match
-                if len(game_parts) >= 3 and len(mc_parts) >= 3 and game_parts[:3] == mc_parts[:3]:
-                    best_match = 3
-                    break
-
-                # Check for two-digit match
-                if len(game_parts) >= 2 and len(mc_parts) >= 2 and game_parts[:2] == mc_parts[:2]:
-                    best_match = max(best_match, 2)
-
-            # Set icon based on best match
-            if best_match == 3:
-                compatibility_icon = "[green]✓[/green] "
-            elif best_match == 2:
-                compatibility_icon = "[yellow]⚠[/yellow] "
-            elif file_info.mc_versions:  # Has version info but no match
-                compatibility_icon = "[red]✗[/red] "
+        compatibility_icon = get_compatibility_info(game_version, file_info.game_versions)
 
         table.add_row(
             version_id,
@@ -186,143 +282,52 @@ def create_version_detail_panel(version_id: str, file_info) -> Panel:
         box=box.ROUNDED,
     )
 
+def compute_compatibility_score(current_version: str, supported_versions: List[str]) -> str:
+    # Parse game version into parts
 
-def create_installed_plugins_table(projects: List[ProjectInfo], game_version: str = None) -> Table:
-    """Create a Rich Table for displaying installed plugin status."""
+    if current_version and supported_versions:
+        game_parts = current_version.split(".")
 
-    table = Table(
-        title=f"[bold cyan]{len(projects)} Plugins Installed[/bold cyan]",
-        box=box.ROUNDED,
-        show_header=True,
-        header_style="bold magenta",
-    )
+        # Check each supported version for best match
+        best_match = 0  # 0 = no match, 2 = two digits, 3 = three digits
+        for mc_version in supported_versions:
+            mc_parts = mc_version.split(".")
 
-    table.add_column("ID", style="dim", width=10)
-    table.add_column("Plugin", style="bold green")
-    table.add_column("Version", style="cyan")
-    table.add_column("Type", style="white")
-    table.add_column("Date", style="dim")
-    table.add_column("Status", style="white", justify="center")
+            # Check for three-digit match
+            if len(game_parts) >= 3 and len(mc_parts) >= 3 and game_parts[:3] == mc_parts[:3]:
+                best_match = 3
+                break
 
-    # for _file_name, file_info, is_outdated, project_name, project_id, latest_version in plugins_data:
-    for project in projects:
-        # Style the version type
-        file_info = project.current_version
-        if file_info is None:
-            continue
-        latest = project.get_latest_type(file_info.version_type)
-        is_outdated = latest.version_id != file_info.version_id
-        project_name = project.name
-        project_id = project.project_id
-        latest_version = project.get_latest_type(file_info.version_type).version_name
-        version_type = file_info.version_type
-        if version_type == "RELEASE":
-            type_display = "[green]●[/green] RELEASE"
-        elif version_type == "BETA":
-            type_display = "[yellow]●[/yellow] BETA"
+            # Check for two-digit match
+            if len(game_parts) >= 2 and len(mc_parts) >= 2 and game_parts[:2] == mc_parts[:2]:
+                best_match = max(best_match, 2)
+        return best_match
+    return -1
+
+def get_compatibility_info(current_version: str, supported_versions: List[str], full: bool = False) -> str:
+    score = compute_compatibility_score(current_version, supported_versions)
+    if full:
+        if score == 3:
+            return f"[green]✓ Compatible[/green] with server version [cyan]{current_version}[/cyan]"
+        elif score == 2:
+            return f"[yellow]⚠ Partially Compatible[/yellow] (supports [cyan]{', '.join(supported_versions)}[/cyan], server is [cyan]{current_version}[/cyan])"
+        elif score == 1:
+            return f"[red]✗ Not Compatible[/red] (supports [cyan]{', '.join(supported_versions)}[/cyan], server is [cyan]{current_version}[/cyan])"
         else:
-            type_display = "[red]●[/red] ALPHA"
-
-        # Check compatibility with game version
-        compatibility_icon = "[dim]?[/dim]"  # Unknown by default
-        if game_version and file_info.game_versions:
-            # Parse game version into parts
-            game_parts = game_version.split(".")
-
-            # Check each supported version for best match
-            best_match = 0  # 0 = no match, 2 = two digits, 3 = three digits
-            for mc_version in file_info.game_versions:
-                mc_parts = mc_version.split(".")
-
-                # Check for three-digit match
-                if len(game_parts) >= 3 and len(mc_parts) >= 3 and game_parts[:3] == mc_parts[:3]:
-                    best_match = 3
-                    break
-
-                # Check for two-digit match
-                if len(game_parts) >= 2 and len(mc_parts) >= 2 and game_parts[:2] == mc_parts[:2]:
-                    best_match = max(best_match, 2)
-
-            # Set icon based on best match
-            if best_match == 3:
-                compatibility_icon = "[green]✓[/green]"
-            elif best_match == 2:
-                compatibility_icon = "[yellow]⚠[/yellow]"
-            elif file_info.game_versions:  # Has version info but no match
-                compatibility_icon = "[red]✗[/red]"
-
-        # Add compatibility icon to version name
-        version_display = f"{compatibility_icon} {file_info.version_name}"
-
-        # Status indicator - show latest version if outdated
-        if is_outdated and latest_version:
-            status_display = f"[yellow]⚠ {latest_version}[/yellow]"
+            return "[dim]? Compatibility Unknown[/dim]"
+    else:
+        if score == 3:
+            return "[green]✓[/green]"
+        elif score == 2:
+            return "[yellow]⚠[/yellow]"
+        elif score == 1:
+            return "[red]✗[/red]"
         else:
-            status_display = "[green]✓ up-to-date[/green]"
-
-        table.add_row(
-            project_id,
-            project_name,
-            version_display,
-            type_display,
-            file_info.release_date.strftime("%Y-%m-%d"),
-            status_display,
-        )
-
-    return table
+            return "[dim]?[/dim]"
+    
 
 
-def create_unidentified_plugins_table(unidentified_data: List[InstallationTable]) -> Table:
-    """Create a Rich Table for displaying unidentified/unrecognized plugins."""
-
-    table = Table(
-        title="[bold yellow]Unidentified Plugins[/bold yellow]",
-        box=box.ROUNDED,
-        show_header=True,
-        header_style="bold magenta",
-    )
-
-    table.add_column("File Name", style="bold yellow")
-    table.add_column("SHA1", style="dim")
-    table.add_column("Size", style="cyan", justify="right")
-
-    # for filename, sha1, file_size in unidentified_data:
-    for installation in unidentified_data:
-        filename = installation.filename
-        sha1 = installation.sha1
-        file_size = installation.filesize
-        # Format file size
-        if file_size < 1024:
-            size_str = f"{file_size} B"
-        elif file_size < 1024 * 1024:
-            size_str = f"{file_size / 1024:.1f} KB"
-        else:
-            size_str = f"{file_size / (1024 * 1024):.1f} MB"
-
-        table.add_row(
-            filename,
-            sha1[:16] + "...",  # Truncate SHA1 for display
-            size_str,
-        )
-
-    return table
 
 
-def print_success(message: str):
-    """Print a success message."""
-    console.print(f"[green]✓[/green] {message}")
 
 
-def print_error(message: str):
-    """Print an error message."""
-    console.print(f"[red]✗[/red] {message}", style="red")
-
-
-def print_warning(message: str):
-    """Print a warning message."""
-    console.print(f"[yellow]⚠[/yellow] {message}", style="yellow")
-
-
-def print_info(message: str):
-    """Print an info message."""
-    console.print(f"[cyan]ℹ[/cyan] {message}")

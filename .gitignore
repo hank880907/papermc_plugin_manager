@@ -11,3 +11,4 @@ wheels/
 plugins
 papermc_plugin_manager.yaml
 version_history.json
+ppm.db
