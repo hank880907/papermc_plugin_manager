@@ -2,34 +2,30 @@ import hashlib
 import json
 import os
 from pathlib import Path
-
-import logzero
 from logzero import logger
 
 from .config import Config
 
+def compute_md5(file_path):
+    m = hashlib.md5()
+    try:
+        with open(file_path, 'rb') as f: # Open in binary mode 'rb'
+            while chunk := f.read(8192): # Read in 8192 byte chunks
+                m.update(chunk)
+    except FileNotFoundError:
+        return "File not found"
+    return m.hexdigest()
 
-def setup_logging(verbose: bool = False, log_file: str = None):
-    """Setup logging configuration.
 
-    Args:
-        verbose: Enable debug logging
-        log_file: Optional log file path
-    """
-    log_level = logzero.logging.DEBUG if verbose else logzero.logging.WARNING
-
-    # Set log level
-    logzero.loglevel(log_level)
-
-    # Setup log file if specified
-    if log_file:
-        logzero.logfile(log_file)
-
-    # Format: timestamp - level - message
-    log_format = "%(asctime)s - %(levelname)s - %(message)s"
-    logzero.formatter(logzero.logging.Formatter(log_format))
-
-    logger.debug("Logging initialized")
+def compute_sha1(path: str | Path, chunk_size: int = None) -> str:
+    if chunk_size is None:
+        chunk_size = Config.DOWNLOAD_CHUNK_SIZE
+    h = hashlib.new("sha1")
+    p = Path(path)
+    with p.open("rb") as f:
+        for chunk in iter(lambda: f.read(chunk_size), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def get_papermc_version():
@@ -51,29 +47,6 @@ def get_papermc_version():
         return None
 
 
-def get_sha1(path: str | Path, chunk_size: int = None) -> str:
-    """Compute the SHA1 hash of a file.
-
-    Args:
-        path: Path to the file
-        chunk_size: Size of chunks to read (defaults to Config.DOWNLOAD_CHUNK_SIZE)
-
-    Returns:
-        str: SHA1 hash as a hexadecimal string
-    """
-    if chunk_size is None:
-        chunk_size = Config.DOWNLOAD_CHUNK_SIZE
-
-    h = hashlib.new("sha1")
-    p = Path(path)
-
-    with p.open("rb") as f:
-        for chunk in iter(lambda: f.read(chunk_size), b""):
-            h.update(chunk)
-
-    return h.hexdigest()
-
-
 def verify_file_hash(file_path: Path | str, expected_sha1: str) -> bool:
     """Verify that a file's SHA1 hash matches the expected value.
 
@@ -84,7 +57,7 @@ def verify_file_hash(file_path: Path | str, expected_sha1: str) -> bool:
     Returns:
         bool: True if hash matches, False otherwise
     """
-    actual_sha1 = get_sha1(file_path)
+    actual_sha1 = compute_sha1(file_path)
     is_valid = actual_sha1.lower() == expected_sha1.lower()
 
     if is_valid:

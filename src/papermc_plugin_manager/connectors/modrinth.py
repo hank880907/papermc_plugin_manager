@@ -1,7 +1,9 @@
 from functools import lru_cache
+from requests import HTTPError
 
 from ..config import Config
 from ..connector_interface import ConnectorInterface, FileInfo, ProjectInfo
+from ..exceptions import PluginNotFoundException
 from .modrinth_models import Project, SearchResponse, TeamMember, Version
 
 
@@ -12,8 +14,8 @@ def version_to_file_info(version: Version) -> FileInfo:
         version_name=version.version_number,
         version_type=version.version_type.name,
         release_date=version.date_published,
-        mc_versions=version.game_versions,
-        hashes={"sha1": version.files[0].hashes.sha1, "sha512": version.files[0].hashes.sha512},
+        game_versions=version.game_versions,
+        sha1=version.files[0].hashes.sha1,
         url=version.files[0].url,
         description=version.changelog or "",
     )
@@ -57,8 +59,9 @@ class Modrinth(ConnectorInterface):
                 break
 
         plugin_info = ProjectInfo(
+            source="Modrinth",
             name=modrinth_project.title,
-            id=modrinth_project.id,
+            project_id=modrinth_project.id,
             author=owner,
             description=modrinth_project.description,
             downloads=modrinth_project.downloads,
@@ -82,9 +85,13 @@ class Modrinth(ConnectorInterface):
         try:
             version = Version.get(id)
             return version_to_file_info(version)
-        except Exception as e:
-            try:
-                version = Version.get_by_hash(id)
-                return version_to_file_info(version)
-            except Exception:
-                raise RuntimeError(f"Failed to get file info for ID {id}: {e}")
+        except HTTPError as e:
+            pass
+
+        try:
+            version = Version.get_by_hash(id)
+            return version_to_file_info(version)
+        except HTTPError as e:
+            pass
+
+        raise PluginNotFoundException(f"File with ID or hash {id} not found on Modrinth.")

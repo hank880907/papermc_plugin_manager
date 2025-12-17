@@ -4,6 +4,10 @@ from rich import box
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+from typing import List
+
+from .connector_interface import ProjectInfo, FileInfo
+from .database import InstallationTable
 
 # Create a global console instance
 console = Console()
@@ -183,25 +187,34 @@ def create_version_detail_panel(version_id: str, file_info) -> Panel:
     )
 
 
-def create_installed_plugins_table(plugins_data: list, game_version: str = None) -> Table:
+def create_installed_plugins_table(projects: List[ProjectInfo], game_version: str = None) -> Table:
     """Create a Rich Table for displaying installed plugin status."""
 
     table = Table(
-        title="[bold cyan]Installed Plugins[/bold cyan]",
+        title=f"[bold cyan]{len(projects)} Plugins Installed[/bold cyan]",
         box=box.ROUNDED,
         show_header=True,
         header_style="bold magenta",
     )
 
-    table.add_column("Project ID", style="dim", width=10)
-    table.add_column("Project", style="bold green")
-    table.add_column("Version Name", style="cyan")
+    table.add_column("ID", style="dim", width=10)
+    table.add_column("Plugin", style="bold green")
+    table.add_column("Version", style="cyan")
     table.add_column("Type", style="white")
-    table.add_column("Release Date", style="dim")
+    table.add_column("Date", style="dim")
     table.add_column("Status", style="white", justify="center")
 
-    for _file_name, file_info, is_outdated, project_name, project_id, latest_version in plugins_data:
+    # for _file_name, file_info, is_outdated, project_name, project_id, latest_version in plugins_data:
+    for project in projects:
         # Style the version type
+        file_info = project.current_version
+        if file_info is None:
+            continue
+        latest = project.get_latest_type(file_info.version_type)
+        is_outdated = latest.version_id != file_info.version_id
+        project_name = project.name
+        project_id = project.project_id
+        latest_version = project.get_latest_type(file_info.version_type).version_name
         version_type = file_info.version_type
         if version_type == "RELEASE":
             type_display = "[green]●[/green] RELEASE"
@@ -212,13 +225,13 @@ def create_installed_plugins_table(plugins_data: list, game_version: str = None)
 
         # Check compatibility with game version
         compatibility_icon = "[dim]?[/dim]"  # Unknown by default
-        if game_version and file_info.mc_versions:
+        if game_version and file_info.game_versions:
             # Parse game version into parts
             game_parts = game_version.split(".")
 
             # Check each supported version for best match
             best_match = 0  # 0 = no match, 2 = two digits, 3 = three digits
-            for mc_version in file_info.mc_versions:
+            for mc_version in file_info.game_versions:
                 mc_parts = mc_version.split(".")
 
                 # Check for three-digit match
@@ -235,7 +248,7 @@ def create_installed_plugins_table(plugins_data: list, game_version: str = None)
                 compatibility_icon = "[green]✓[/green]"
             elif best_match == 2:
                 compatibility_icon = "[yellow]⚠[/yellow]"
-            elif file_info.mc_versions:  # Has version info but no match
+            elif file_info.game_versions:  # Has version info but no match
                 compatibility_icon = "[red]✗[/red]"
 
         # Add compatibility icon to version name
@@ -245,7 +258,7 @@ def create_installed_plugins_table(plugins_data: list, game_version: str = None)
         if is_outdated and latest_version:
             status_display = f"[yellow]⚠ {latest_version}[/yellow]"
         else:
-            status_display = "[green]✓ Current[/green]"
+            status_display = "[green]✓ up-to-date[/green]"
 
         table.add_row(
             project_id,
@@ -259,7 +272,7 @@ def create_installed_plugins_table(plugins_data: list, game_version: str = None)
     return table
 
 
-def create_unidentified_plugins_table(unidentified_data: list) -> Table:
+def create_unidentified_plugins_table(unidentified_data: List[InstallationTable]) -> Table:
     """Create a Rich Table for displaying unidentified/unrecognized plugins."""
 
     table = Table(
@@ -273,7 +286,11 @@ def create_unidentified_plugins_table(unidentified_data: list) -> Table:
     table.add_column("SHA1", style="dim")
     table.add_column("Size", style="cyan", justify="right")
 
-    for filename, sha1, file_size in unidentified_data:
+    # for filename, sha1, file_size in unidentified_data:
+    for installation in unidentified_data:
+        filename = installation.filename
+        sha1 = installation.sha1
+        file_size = installation.filesize
         # Format file size
         if file_size < 1024:
             size_str = f"{file_size} B"
