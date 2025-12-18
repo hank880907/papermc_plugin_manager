@@ -247,10 +247,11 @@ def upgrade(
     if not yes:
         typer.confirm("Do you want to proceed with the upgrade?", abort=True, default=False)
 
-    try:
-        ctx.invoke(install, name=project.project_id, version=new_version.version_name)
-    except Exception as e:
-        console.print_error(f"Failed to upgrade plugin '{project.name}': {e}")
+    for project, new_version in upgrade_summary:
+        try:
+            ctx.invoke(install, ctx, name=project.project_id, version=new_version.version_name)
+        except Exception as e:
+            console.print_error(f"Failed to upgrade plugin '{project.name}': {e}")
     
 
     
