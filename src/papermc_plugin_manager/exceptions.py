@@ -1,5 +1,5 @@
 """Custom exceptions for PaperMC Plugin Manager."""
-from typing import Optional
+
 
 class PPMException(Exception):
     pass
@@ -8,7 +8,7 @@ class PPMException(Exception):
 class PluginNotFoundException(PPMException):
     """Raised when a plugin cannot be found."""
 
-    def __init__(self, plugin_name: str, message: Optional[str] = None):
+    def __init__(self, plugin_name: str, message: str | None = None):
         self.plugin_name = plugin_name
         self.message = message or f"Plugin '{plugin_name}' not found"
         super().__init__(self.message)
@@ -17,7 +17,7 @@ class PluginNotFoundException(PPMException):
 class VersionNotFoundException(PPMException):
     """Raised when a specific version cannot be found."""
 
-    def __init__(self, plugin_name: str, version: str, message: Optional[str] = None):
+    def __init__(self, plugin_name: str, version: str, message: str | None = None):
         self.plugin_name = plugin_name
         self.version = version
         self.message = message or f"Version '{version}' not found for plugin '{plugin_name}'"
@@ -27,7 +27,7 @@ class VersionNotFoundException(PPMException):
 class DownloadFailedException(PPMException):
     """Raised when a download fails."""
 
-    def __init__(self, url: str, reason: Optional[str] = None):
+    def __init__(self, url: str, reason: str | None = None):
         self.url = url
         self.reason = reason
         self.message = f"Download failed for {url}"
@@ -39,7 +39,7 @@ class DownloadFailedException(PPMException):
 class CacheException(PPMException):
     """Raised when cache operations fail."""
 
-    def __init__(self, operation: str, reason: Optional[str] = None):
+    def __init__(self, operation: str, reason: str | None = None):
         self.operation = operation
         self.reason = reason
         self.message = f"Cache operation '{operation}' failed"
@@ -51,7 +51,7 @@ class CacheException(PPMException):
 class InvalidVersionException(PPMException):
     """Raised when a version string is invalid."""
 
-    def __init__(self, version: str, message: Optional[str] = None):
+    def __init__(self, version: str, message: str | None = None):
         self.version = version
         self.message = message or f"Invalid version string: '{version}'"
         super().__init__(self.message)
@@ -70,6 +70,6 @@ class PluginAlreadyInstalledException(PPMException):
 class ServerVersionException(PPMException):
     """Raised when server version cannot be determined."""
 
-    def __init__(self, message: Optional[str] = None):
+    def __init__(self, message: str | None = None):
         self.message = message or "Could not determine PaperMC server version"
         super().__init__(self.message)

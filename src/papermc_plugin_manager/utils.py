@@ -2,9 +2,9 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from logzero import logger
-from typing import Optional
+
 import requests
+from logzero import logger
 
 
 def compute_md5(file_path):
@@ -18,7 +18,7 @@ def compute_md5(file_path):
     return m.hexdigest()
 
 
-def compute_sha1(path: str | Path, chunk_size: Optional[int] = None) -> str:
+def compute_sha1(path: str | Path, chunk_size: int | None = None) -> str:
     if chunk_size is None:
         chunk_size = 1024 * 1024
     h = hashlib.new("sha1")

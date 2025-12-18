@@ -1,14 +1,14 @@
-import os
-from pathlib import Path
 import glob
-from typing import Dict, List, Tuple, Optional, Callable
+import os
+from collections.abc import Callable
+from pathlib import Path
+
 from logzero import logger
 
-from .database import SourceDatabase, InstallationTable
-from .utils import compute_sha1, default_feedback_cb
-from .connector_interface import get_connector, list_connectors, ConnectorInterface, ProjectInfo, SearchResult
+from .connector_interface import ConnectorInterface, ProjectInfo, SearchResult, get_connector, list_connectors
+from .database import InstallationTable, SourceDatabase
 from .exceptions import PluginNotFoundException
-
+from .utils import compute_sha1, default_feedback_cb
 
 
 class PluginManager:
@@ -16,7 +16,7 @@ class PluginManager:
     def __init__(self, default_source: str):
         self.db = SourceDatabase()
         self.plugin_dir = "plugins"
-        self.connectors: Dict[str, ConnectorInterface] = {}
+        self.connectors: dict[str, ConnectorInterface] = {}
         for connector_name in list_connectors():
             self.connectors[connector_name] = get_connector(connector_name)
         self.default_source = default_source
@@ -28,9 +28,8 @@ class PluginManager:
         if not os.path.exists(self.plugin_dir):
             logger.warning(f"Plugin directory {self.plugin_dir} does not exist.")
             return []
-        plugin_files = glob.glob(os.path.join(self.plugin_dir, "*.jar"))
-        return plugin_files
-    
+        return glob.glob(os.path.join(self.plugin_dir, "*.jar"))
+
     def needs_update(self) -> bool:
         """check if plugin manager needs to update installed plugins."""
         installed_plugins = self.get_installed_plugins_filename()
@@ -39,7 +38,7 @@ class PluginManager:
             if not self.db.is_sha1_known(sha1):
                 return True
         return False
-    
+
     def update(self, feedback_cb: Callable[[str], None] = default_feedback_cb):
         # get the installed plugins and their hashes.
         plugins = self.get_installed_plugins_filename()
@@ -77,7 +76,7 @@ class PluginManager:
             except PluginNotFoundException as e:
                 logger.warning(f"Plugin with SHA1 {installation.sha1} not found on {connector.__class__.__name__}: {e}")
 
-    def get_installations(self) -> Tuple[List[ProjectInfo], List[InstallationTable]]:
+    def get_installations(self) -> tuple[list[ProjectInfo], list[InstallationTable]]:
         installations = self.db.get_all_installations()
         projects = []
         unrecognized = []
@@ -89,20 +88,20 @@ class PluginManager:
                 continue
             projects.append(project)
         return projects, unrecognized
-    
-    def get_installation_names(self) -> List[str]:
+
+    def get_installation_names(self) -> list[str]:
         """Get a list of installed plugin names for autocompletion."""
         installations, _ = self.get_installations()
         return [plugin.name for plugin in installations] + [plugin.project_id for plugin in installations]
-    
+
     def get_project_info(self, name):
         project_info = self.db.get_project_info(name)
         if project_info:
             logger.debug(f"Found local project info for '{name}': '{project_info.name}'")
             return project_info
-        
+
         logger.debug(f"Project '{name}' not found in local database. Querying default source '{self.default_source}'")
-        
+
         try:
             logger.debug(f"Fetching project info for '{name}' from default source '{self.default_source}'")
             project_info = self.connectors[self.default_source].get_project_info(name)
@@ -113,10 +112,10 @@ class PluginManager:
             return project_info
         except PluginNotFoundException:
             pass
-        
+
         return None
-    
-    def fuzzy_find_project(self, name: str) -> Tuple[bool, Optional[ProjectInfo]]:
+
+    def fuzzy_find_project(self, name: str) -> tuple[bool, ProjectInfo | None]:
         """Fuzzy find projects by name across all connectors."""
         project = self.get_project_info(name)
         if project:
@@ -134,10 +133,10 @@ class PluginManager:
                     return False, project_info
         except PluginNotFoundException:
             pass
-        
+
         return False, None
-    
-    def search_projects(self, query: str, mc_version: Optional[str] = None, limit: int = 10) -> List[SearchResult]:
+
+    def search_projects(self, query: str, mc_version: str | None = None, limit: int = 10) -> list[SearchResult]:
         """Search for projects across all connectors."""
         connector = self.connectors[self.default_source]
         try:

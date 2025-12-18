@@ -1,9 +1,10 @@
-from importlib.metadata import version
-import typer
-from typing import Annotated
 from dataclasses import dataclass
-import logzero
+from importlib.metadata import version
 from pathlib import Path
+from typing import Annotated
+
+import logzero
+import typer
 
 from .console import console
 from .logging import setup_logging
@@ -24,7 +25,7 @@ class CliContext:
 def connectors():
     """List available connectors"""
     pm = get_plugin_manager()
-    for connector_name in pm.connectors.keys():
+    for connector_name in pm.connectors:
         console.print(f"{connector_name}")
 
 
@@ -34,7 +35,6 @@ def update(
 ):
     """update information of the installed plugins"""
     pm = get_plugin_manager()
-    context: CliContext = ctx.obj
     with console.status("[bold green]Fetching plugin information...") as status:
         pm.update(lambda msg: status.update(msg))
     console.print("[green]✓[/green] [white]done[/white]")
@@ -47,18 +47,18 @@ def list_installations(
     """list installed plugins"""
     pm = get_plugin_manager()
     context: CliContext = ctx.obj
-    
+
     console.print_info(f"PaperMC version: {context.game_version}")
     installations, unrecognized = pm.get_installations()
     if not installations:
         console.print_warning("No installed plugins found.")
         console.print("Run [green]ppm update[/green] to scan for installed plugins.")
         raise typer.Exit()
-    
+
     if pm.needs_update():
         console.print_warning("Some installed plugins are not recognized in the database.")
         console.print("Run [green]ppm update[/green] to identify them.")
-    
+
     console.print_installed_plugins_table(installations, context.game_version)
     if unrecognized:
         console.print(f"\n[bold]Unrecognized Plugins: {len(unrecognized)}[/bold]")
@@ -85,20 +85,20 @@ def show(
     if not project:
         console.print_error(f"Plugin '{name}' not found.")
         raise typer.Exit(code=1)
-    
+
     if not exact_match:
         typer.confirm(f"Did you mean plugin '{project.name}' (ID: {project.project_id})?", abort=True, default=True)
-    
+
     current_version = project.current_version
     filename = None
     if current_version:
         installation = pm.db.get_installation_by_sha1(current_version.sha1)
         if installation:
             filename = installation.filename
-            
+
     console.print("")
     console.print_project_info_panel(project, filename, context.game_version)
-    
+
     if version:
         file_info = project.get_version(version)
         if file_info is None:
@@ -107,7 +107,7 @@ def show(
             console.print_version_detail_panel(file_info)
     elif current_version:
         console.print_version_detail_panel(current_version, "Installed Version Details")
-        
+
     count = 0
     versions_to_show = []
     for file_info in sorted(project.versions.values(), key=lambda fi: fi.release_date, reverse=True):
@@ -121,8 +121,8 @@ def show(
         console.print_version_table(versions_to_show, "Available Versions", context.game_version)
     else:
         console.print_warning("No versions available")
-        
-        
+
+
 @app.command()
 def search(
     ctx: typer.Context,
@@ -132,15 +132,15 @@ def search(
     """search for plugins"""
     pm = get_plugin_manager()
     context: CliContext = ctx.obj
-    
-    with console.status("Searching...") as status:
+
+    with console.status("Searching..."):
         results = pm.search_projects(query, mc_version=context.game_version, limit=limit)
-        
+
     if results:
         console.print_search_results_table(results)
     else:
         console.print_warning("No plugins found matching the query.")
-        
+
 
 @app.command()
 def install(
@@ -150,20 +150,21 @@ def install(
     snapshot: Annotated[bool, typer.Option(help="Allow installation of snapshot versions if no release version is found.", is_flag=True, show_default=True)] = False,
 ):
     """install or update a plugin"""
-    from .utils import download_file
     from rich.progress import BarColumn, DownloadColumn, Progress, TimeRemainingColumn, TransferSpeedColumn
-    
+
+    from .utils import download_file
+
     pm = get_plugin_manager()
     context: CliContext = ctx.obj
-    
+
     exact_match, project = pm.fuzzy_find_project(name)
     if not project:
         console.print_error(f"Plugin '{name}' not found.")
         raise typer.Exit(code=1)
-    
+
     if not exact_match:
         typer.confirm(f"Did you mean plugin '{project.name}' (ID: {project.project_id})?", abort=True, default=False)
-        
+
     if version:
         version_info = project.get_version(version)
         if version_info is None:
@@ -185,11 +186,11 @@ def install(
         if version_info is None:
             console.print_warning(f"No release version found for plugin '{project.name}'. Using latest version...")
             version_info = project.get_latest()
-        
+
     if version_info is None:
         console.print_error(f"No suitable version found for plugin '{project.name}'.")
         raise typer.Exit(code=1)
-    
+
     # remove existing installation if present
     if project.current_version:
         installation = pm.db.get_installation_by_sha1(project.current_version.sha1)
@@ -199,7 +200,7 @@ def install(
                 console.print(f"Removing existing installation '{installation.filename}'...")
                 plugin_path.unlink()
             pm.db.remove_installation(installation.filename)
-    
+
     filename = project.name.replace(" ", "_") + "-" + version_info.version_name + ".jar"
     url = pm.connectors[context.default_source].get_download_link(version_info)
     with Progress(
@@ -232,7 +233,7 @@ def setup_app(
     if game_version is None:
         console.print_warning("Could not determine PaperMC version from version_history.json. Please run this tool in the directory containing your PaperMC server.")
         raise typer.Exit(code=1)
-    
+
     from .config import Config
     Config.DEFAULT_SOURCE = default_source
 
@@ -245,7 +246,7 @@ def setup_app(
         app_version = version("papermc_plugin_manager")
         console.print(f"[cyan]PaperMC Plugin Manager[/cyan] [green]v{app_version}[/green]")
         raise typer.Exit()
-    
+
 
 def main():
     app()

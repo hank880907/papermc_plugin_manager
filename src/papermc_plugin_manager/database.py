@@ -1,12 +1,12 @@
-from sqlalchemy import create_engine, String, Integer, Text, select, ForeignKey, DateTime,  UniqueConstraint, Index
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session, relationship
-from sqlalchemy.types import JSON
-from sqlalchemy.ext.mutable import MutableList
-from typing import List, Dict
 from datetime import datetime
-from logzero import logger
 
-from .connector_interface import ConnectorInterface, FileInfo, ProjectInfo
+from logzero import logger
+from sqlalchemy import DateTime, Integer, String, Text, create_engine, select
+from sqlalchemy.ext.mutable import MutableList
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
+from sqlalchemy.types import JSON
+
+from .connector_interface import FileInfo, ProjectInfo
 
 
 class Base(DeclarativeBase):
@@ -18,7 +18,7 @@ class FileHashTable(Base):
     sha1: Mapped[str] = mapped_column(String, index=True)
     hash_type: Mapped[str] = mapped_column(String, nullable=False)
     hash_digest: Mapped[str] = mapped_column(String, nullable=False, index=True)
-    
+
     @classmethod
     def from_hashes(cls, hashes: dict[str, str]) -> list["FileHashTable"]:
         hash_tables = []
@@ -29,7 +29,7 @@ class FileHashTable(Base):
                 hash_digest=hash_digest,
             ))
         return hash_tables
-    
+
 
 class FileTable(Base):
     __tablename__ = 'file'
@@ -57,7 +57,7 @@ class FileTable(Base):
             url=info.url,
             description=info.description,
         )
-    
+
     def update(self, info: FileInfo):
         self.project_id = info.project_id
         self.version_name = info.version_name
@@ -102,14 +102,14 @@ class ProjectTable(Base):
             description=info.description,
             downloads=info.downloads,
         )
-    
+
     def update(self, info: ProjectInfo):
         self.name = info.name
         self.author = info.author
         self.description = info.description
         self.downloads = info.downloads
 
-    def to_project_info(self, info_list: List[FileTable], hashes: List[Dict[str, str]]) -> ProjectInfo:
+    def to_project_info(self, info_list: list[FileTable], hashes: list[dict[str, str]]) -> ProjectInfo:
         return ProjectInfo(
             source=self.source,
             project_id=self.project_id,
@@ -119,7 +119,7 @@ class ProjectTable(Base):
             downloads=self.downloads,
             versions={file.version_id: file.to_file_info() for file in info_list},
         )
-    
+
 class InstallationTable(Base):
     __tablename__ = 'installation'
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -136,15 +136,13 @@ class SourceDatabase:
     def get_project_table_by_id(self, project_id: str) -> ProjectTable | None:
         with Session(self.engine) as session:
             stmt = select(ProjectTable).where(ProjectTable.project_id == project_id)
-            project = session.execute(stmt).scalar_one_or_none()
-            return project
-        
+            return session.execute(stmt).scalar_one_or_none()
+
     def get_project_table_by_name(self, name: str) -> ProjectTable | None:
         with Session(self.engine) as session:
             stmt = select(ProjectTable).where(ProjectTable.name == name)
-            project = session.execute(stmt).scalar_one_or_none()
-            return project
-        
+            return session.execute(stmt).scalar_one_or_none()
+
     def get_project_table(self, name) -> ProjectTable | None:
         project = self.get_project_table_by_id(name)
         if project is None:
@@ -156,13 +154,12 @@ class SourceDatabase:
             stmt = select(FileTable).where(FileTable.project_id == project_id)
             files = session.execute(stmt).scalars().all()
             return list(files)
-        
+
     def get_file_by_sha1(self, sha1: str) -> FileTable | None:
         with Session(self.engine) as session:
             stmt = select(FileTable).where(FileTable.sha1 == sha1)
-            file = session.execute(stmt).scalar_one_or_none()
-            return file
-        
+            return session.execute(stmt).scalar_one_or_none()
+
     def get_project_by_file_sha1(self, sha1: str) -> ProjectInfo | None:
         file_table = self.get_file_by_sha1(sha1)
         if file_table is None:
@@ -171,15 +168,14 @@ class SourceDatabase:
         if project_table is None:
             return None
         return self.get_project_info(project_table.project_id)
-    
+
     def get_hashes_by_file_sha1(self, sha1: str) -> dict[str, str]:
         stmt = select(FileHashTable).where(FileHashTable.sha1 == sha1)
         with Session(self.engine) as session:
             hash_tables = session.execute(stmt).scalars().all()
             if not hash_tables:
                 return {}
-            file_hashes = {hash_table.hash_type: hash_table.hash_digest for hash_table in hash_tables}
-            return file_hashes
+            return {hash_table.hash_type: hash_table.hash_digest for hash_table in hash_tables}
 
     def get_project_info(self, name: str) -> ProjectInfo | None:
         project_table = self.get_project_table(name)
@@ -190,7 +186,7 @@ class SourceDatabase:
         for file in files:
             file_hashes = self.get_hashes_by_file_sha1(file.sha1)
             hashes.append(file_hashes)
-        
+
         project_info = project_table.to_project_info(files, hashes)
         with Session(self.engine) as session:
             stmt = (
@@ -220,7 +216,7 @@ class SourceDatabase:
             else:
                 project_table.update(info)
                 session.commit()
-            
+
             for file_info in info.versions.values():
                 stmt = select(FileTable).where(
                     FileTable.project_id == info.project_id,
@@ -232,9 +228,9 @@ class SourceDatabase:
                     session.add(file_table)
                 else:
                     file_table.update(file_info)
-                    
+
                 hash_tables = FileHashTable.from_hashes(file_info.hashes)
-                
+
                 for hash_table in hash_tables:
                     stmt = select(FileHashTable).where(
                         FileHashTable.sha1 == hash_table.sha1,
@@ -262,7 +258,7 @@ class SourceDatabase:
                 logger.debug(f"Updating installation filename from {installation.filename} to {filename}.")
                 installation.filename = filename
             session.commit()
-            
+
     def remove_installation(self, filename: str):
         with Session(self.engine) as session:
             stmt = select(InstallationTable).where(InstallationTable.filename == filename)
@@ -272,7 +268,7 @@ class SourceDatabase:
                 session.delete(installation)
                 session.commit()
 
-    def remove_stale_installations(self, valid_sha1s: List[str]):
+    def remove_stale_installations(self, valid_sha1s: list[str]):
         with Session(self.engine) as session:
             stmt = select(InstallationTable).where(InstallationTable.sha1.not_in(valid_sha1s))
             stale_installations = session.execute(stmt).scalars().all()
@@ -281,18 +277,17 @@ class SourceDatabase:
                 session.delete(installation)
             session.commit()
 
-    def get_all_installations(self) -> List[InstallationTable]:
+    def get_all_installations(self) -> list[InstallationTable]:
         with Session(self.engine) as session:
             stmt = select(InstallationTable)
             installations = session.execute(stmt).scalars().all()
             return list(installations)
-        
+
     def get_installation_by_sha1(self, sha1: str) -> InstallationTable | None:
         with Session(self.engine) as session:
             stmt = select(InstallationTable).where(InstallationTable.sha1 == sha1)
-            installation = session.execute(stmt).scalar_one_or_none()
-            return installation
-        
+            return session.execute(stmt).scalar_one_or_none()
+
     def is_sha1_known(self, sha1: str) -> bool:
         with Session(self.engine) as session:
             stmt = select(InstallationTable).where(InstallationTable.sha1 == sha1)

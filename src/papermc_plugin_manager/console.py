@@ -1,17 +1,17 @@
 """Rich console utilities for the PaperMC Plugin Manager CLI."""
 
+
 from rich import box
 from rich.console import Console, Group
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-from typing import List, Optional, Dict, Tuple
 
-from .connector_interface import ProjectInfo, FileInfo, SearchResult
+from .connector_interface import FileInfo, ProjectInfo, SearchResult
 from .database import InstallationTable
 
 
-def get_key_value_table(data: List[Tuple[str, str]]) -> Table:
+def get_key_value_table(data: list[tuple[str, str]]) -> Table:
     table = Table.grid(padding=(0, 3))
     table.add_column(justify="left", style="cyan", no_wrap=True)
     table.add_column(style="white", no_wrap=False)
@@ -38,8 +38,8 @@ class PpmConsole(Console):
     def print_info(self, message: str):
         self.print(f"[cyan]ℹ[/cyan] {message}")
 
-    def print_project_info_panel(self, info: ProjectInfo, filename: Optional[str] = None, game_version: Optional[str] = None):
-        
+    def print_project_info_panel(self, info: ProjectInfo, filename: str | None = None, game_version: str | None = None):
+
         latest_version = info.get_latest()
         latest_release_version = info.get_latest_type("release")
 
@@ -61,7 +61,7 @@ class PpmConsole(Console):
             ("Latest Release", latest_release_name if latest_release_name else "N/A"),
             ("Source", info.source),
         ]
-        
+
         elements.append(get_key_value_table(info_data))
 
         elements.append(Text(""))
@@ -70,7 +70,7 @@ class PpmConsole(Console):
             if game_version:
                 elements.append(Text.from_markup(get_compatibility_info(game_version, info.current_version.game_versions, full=True)))
         else:
-            elements.append(Text.from_markup(f"[dim]Not installed[/dim]"))
+            elements.append(Text.from_markup("[dim]Not installed[/dim]"))
 
         if description:
             elements.append(Text(""))
@@ -86,9 +86,9 @@ class PpmConsole(Console):
             )
         )
 
-    def print_installed_plugins_table(self, projects: List[ProjectInfo], game_version: Optional[str] = None):
+    def print_installed_plugins_table(self, projects: list[ProjectInfo], game_version: str | None = None):
         table = Table(
-            title=f"[bold cyan] Installed Plugins [/bold cyan]",
+            title="[bold cyan] Installed Plugins [/bold cyan]",
             box=box.ROUNDED,
             show_header=True,
             header_style="bold magenta",
@@ -106,9 +106,9 @@ class PpmConsole(Console):
             file_info = project.current_version
             if file_info is None:
                 continue
-            
+
             latest_upgradable = project.get_latest_type(file_info.version_type)
-            
+
             project_name = project.name
             project_id = project.project_id
             type_display = get_release_type_string(file_info.version_type)
@@ -136,7 +136,7 @@ class PpmConsole(Console):
             )
         self.print(table)
 
-    def print_unidentified_plugins_table(self, unidentified_data: List[InstallationTable]):
+    def print_unidentified_plugins_table(self, unidentified_data: list[InstallationTable]):
 
         table = Table(
             title="[bold yellow]Unidentified Plugins[/bold yellow]",
@@ -168,17 +168,17 @@ class PpmConsole(Console):
                 size_str,
             )
         self.print(table)
-        
+
     def print_version_detail_panel(self, file_info: FileInfo, title: str = "Version Details"):
         groups = []
-        
+
         info = [("Version Name", file_info.version_name),
                 ("Project ID", file_info.project_id),
                 ("Version Type", get_release_type_string(file_info.version_type)),
                 ("Release Date", file_info.release_date.strftime("%Y-%m-%d %H:%M:%S")),
                 ("MC Versions", ", ".join(file_info.game_versions)),
                 ("Download URL", file_info.url)]
-        
+
         groups.append(get_key_value_table(info))
 
         if file_info.hashes:
@@ -191,15 +191,15 @@ class PpmConsole(Console):
             groups.append(Text.from_markup(""))
             groups.append(Text.from_markup("[yellow]Description:[/yellow]"))
             groups.append(Text.from_markup(file_info.description))
-            
+
         self.print(Panel(
             Group(*groups),
             title=f"[bold green]{title}[/bold green]",
             border_style="green",
             box=box.ROUNDED,
         ))
-        
-    def print_version_table(self, versions_data: List[FileInfo], title: str = "Available Versions", game_version: Optional[str] = None):
+
+    def print_version_table(self, versions_data: list[FileInfo], title: str = "Available Versions", game_version: str | None = None):
         table = Table(
             title=f"[bold cyan]{title}[/bold cyan]",
             box=box.ROUNDED,
@@ -227,8 +227,8 @@ class PpmConsole(Console):
                 mc_versions,
             )
         self.print(table)
-        
-    def print_search_results_table(self, results: List[SearchResult]):
+
+    def print_search_results_table(self, results: list[SearchResult]):
         """Create a Rich Table for displaying search results."""
 
         table = Table(
@@ -259,13 +259,13 @@ class PpmConsole(Console):
         self.print(table)
 
 
-    
+
 console = PpmConsole()
 
 
 
 
-def compute_compatibility_score(supported_versions: List[str], current_version: Optional[str]) -> int:
+def compute_compatibility_score(supported_versions: list[str], current_version: str | None) -> int:
     # Parse game version into parts
 
     if current_version and supported_versions:
@@ -287,33 +287,29 @@ def compute_compatibility_score(supported_versions: List[str], current_version: 
         return best_match
     return -1
 
-def get_compatibility_info(current_version: Optional[str], supported_versions: List[str], full: bool = False) -> str:
+def get_compatibility_info(current_version: str | None, supported_versions: list[str], full: bool = False) -> str:
     score = compute_compatibility_score(supported_versions, current_version)
     if full:
         if score == 3:
             return f"[green]✓ Compatible[/green] with server version [cyan]{current_version}[/cyan]"
-        elif score == 2:
+        if score == 2:
             return f"[yellow]⚠ Partially Compatible[/yellow] (supports [cyan]{', '.join(supported_versions)}[/cyan], server is [cyan]{current_version}[/cyan])"
-        elif score == 1:
+        if score == 1:
             return f"[red]✗ Not Compatible[/red] (supports [cyan]{', '.join(supported_versions)}[/cyan], server is [cyan]{current_version}[/cyan])"
-        else:
-            return "[dim]? Compatibility Unknown[/dim]"
-    else:
-        if score == 3:
-            return "[green]✓[/green]"
-        elif score == 2:
-            return "[yellow]⚠[/yellow]"
-        elif score == 1:
-            return "[red]✗[/red]"
-        else:
-            return "[dim]?[/dim]"
-    
+        return "[dim]? Compatibility Unknown[/dim]"
+    if score == 3:
+        return "[green]✓[/green]"
+    if score == 2:
+        return "[yellow]⚠[/yellow]"
+    if score == 1:
+        return "[red]✗[/red]"
+    return "[dim]?[/dim]"
+
 def get_release_type_string(version_type: str) -> str:
     if version_type == "RELEASE":
         return "[green]●[/green] RELEASE"
-    elif version_type == "BETA":
+    if version_type == "BETA":
         return "[yellow]●[/yellow] BETA"
-    elif version_type == "ALPHA":
+    if version_type == "ALPHA":
         return "[red]●[/red] ALPHA"
-    else:
-        return f"[dim]●[/dim] {version_type}"
+    return f"[dim]●[/dim] {version_type}"

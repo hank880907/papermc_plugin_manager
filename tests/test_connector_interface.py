@@ -2,14 +2,11 @@
 
 from datetime import datetime
 
-import pytest
-from semantic_version import Version
-
 from papermc_plugin_manager.connector_interface import FileInfo, ProjectInfo
 
 
-class TestProjectInfoGetLatestRelease:
-    """Tests for ProjectInfo.get_latest_release() method."""
+class TestProjectInfoGetLatestType:
+    """Tests for ProjectInfo.get_latest_type('release') method."""
 
     def test_no_versions_returns_none(self):
         """Test that get_latest_release returns None when there are no versions."""
@@ -22,7 +19,7 @@ class TestProjectInfoGetLatestRelease:
             downloads=0,
             versions={},
         )
-        assert project.get_latest_release() is None
+        assert project.get_latest_type() is None
 
     def test_no_release_versions_returns_none(self):
         """Test that get_latest_release returns None when there are no release versions."""
@@ -55,7 +52,7 @@ class TestProjectInfoGetLatestRelease:
             downloads=0,
             versions={"v1": beta_version, "v2": alpha_version},
         )
-        assert project.get_latest_release() is None
+        assert project.get_latest_type() is None
 
     def test_single_release_version(self):
         """Test that get_latest_release returns the only release version."""
@@ -78,7 +75,7 @@ class TestProjectInfoGetLatestRelease:
             downloads=0,
             versions={"v1": release_version},
         )
-        assert project.get_latest_release() == release_version
+        assert project.get_latest_type() == release_version
 
     def test_multiple_releases_semantic_versioning(self):
         """Test that get_latest_release returns the highest semantic version."""
@@ -121,7 +118,7 @@ class TestProjectInfoGetLatestRelease:
             downloads=0,
             versions={"v1": v1, "v2": v2, "v3": v1_5},
         )
-        assert project.get_latest_release() == v2
+        assert project.get_latest_type() == v2
 
     def test_unparseable_versions_use_date_fallback(self):
         """Test that unparseable version names fall back to date comparison."""
@@ -154,7 +151,7 @@ class TestProjectInfoGetLatestRelease:
             downloads=0,
             versions={"v1": older, "v2": newer},
         )
-        assert project.get_latest_release() == newer
+        assert project.get_latest_type() == newer
 
     def test_mixed_parseable_and_unparseable_versions(self):
         """Test handling of mixed parseable and unparseable version names."""
@@ -198,7 +195,7 @@ class TestProjectInfoGetLatestRelease:
             versions={"v1": parseable, "v2": unparseable_older, "v3": unparseable_newer},
         )
         # Should return the newest by date when mixing parseable and unparseable
-        result = project.get_latest_release()
+        result = project.get_latest_type()
         assert result == unparseable_newer
 
     def test_case_insensitive_version_type(self):
@@ -242,7 +239,7 @@ class TestProjectInfoGetLatestRelease:
             downloads=0,
             versions={"v1": release_lower, "v2": release_upper, "v3": release_mixed},
         )
-        assert project.get_latest_release() == release_mixed
+        assert project.get_latest_type() == release_mixed
 
     def test_semantic_version_with_prerelease_tag(self):
         """Test semantic versioning with prerelease tags in RELEASE versions."""
@@ -276,7 +273,7 @@ class TestProjectInfoGetLatestRelease:
             versions={"v1": v1, "v2": v2_prerelease},
         )
         # 2.0.0-rc.1 should be considered greater than 1.0.0 in semantic versioning
-        assert project.get_latest_release() == v2_prerelease
+        assert project.get_latest_type() == v2_prerelease
 
     def test_filters_non_release_versions(self):
         """Test that non-release versions are properly filtered out."""
@@ -310,7 +307,7 @@ class TestProjectInfoGetLatestRelease:
             versions={"v1": release, "v2": beta_newer},
         )
         # Should return the release version even though beta has a higher version number
-        assert project.get_latest_release() == release
+        assert project.get_latest_type() == release
 
     def test_version_with_v_prefix(self):
         """Test that versions with 'v' prefix are handled correctly."""
@@ -343,7 +340,7 @@ class TestProjectInfoGetLatestRelease:
             downloads=0,
             versions={"v1": v1, "v2": v2},
         )
-        assert project.get_latest_release() == v2
+        assert project.get_latest_type() == v2
 
     def test_mixed_v_prefix_and_no_prefix(self):
         """Test that mixed versions with and without 'v' prefix are compared correctly."""
@@ -377,7 +374,7 @@ class TestProjectInfoGetLatestRelease:
             versions={"v1": with_prefix, "v2": without_prefix},
         )
         # v2.0.0 should be greater than 1.5.0
-        assert project.get_latest_release() == with_prefix
+        assert project.get_latest_type() == with_prefix
 
     def test_uppercase_v_prefix(self):
         """Test that uppercase 'V' prefix is also handled."""
@@ -410,4 +407,4 @@ class TestProjectInfoGetLatestRelease:
             downloads=0,
             versions={"v1": v1, "v2": v2},
         )
-        assert project.get_latest_release() == v2
+        assert project.get_latest_type() == v2

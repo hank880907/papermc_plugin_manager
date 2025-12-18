@@ -1,8 +1,9 @@
+
 import logzero
 from logzero import logger
-from typing import Optional
 
-def setup_logging(verbose: int = 0, log_file: Optional[str] = None):
+
+def setup_logging(verbose: int = 0, log_file: str | None = None):
     if verbose == 0:
         log_level = logzero.logging.WARNING
     elif verbose == 1:

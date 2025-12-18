@@ -4,11 +4,10 @@ Pydantic models for Modrinth API responses.
 Based on Modrinth API v2 documentation: https://docs.modrinth.com/api
 """
 
-import contextlib
 import json
 from datetime import datetime
 from enum import Enum
-from typing import Any, List, Callable
+from typing import Any
 
 import requests
 from pydantic import BaseModel, ConfigDict, Field
@@ -234,7 +233,7 @@ class Version(BaseModel):
         loaders: list[str] | None = None,
         game_versions: list[str] | None = None,
         featured: bool | None = None,
-    ) -> List["Version"]:
+    ) -> list["Version"]:
         """
         List all versions for a project with optional filters.
 
@@ -345,7 +344,7 @@ class Project(BaseModel):
         return cls(**data)
 
     @classmethod
-    def get_multiple(cls, project_ids: list[str]) -> List["Project"]:
+    def get_multiple(cls, project_ids: list[str]) -> list["Project"]:
         """
         Get multiple projects by their IDs.
 

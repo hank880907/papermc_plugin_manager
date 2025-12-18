@@ -1,8 +1,8 @@
+from collections.abc import Callable
 from functools import lru_cache
-from requests import HTTPError
-from importlib.metadata import version
-from typing import Callable, Optional
+from importlib.metadata import version as pkg_version
 
+from requests import HTTPError
 
 from ..connector_interface import ConnectorInterface, FileInfo, ProjectInfo, SearchResult
 from ..exceptions import PluginNotFoundException
@@ -36,18 +36,18 @@ class Modrinth(ConnectorInterface):
     def HEADERS(self):
         """Get headers with configurable User-Agent."""
         return {
-            "User-Agent": f"papermc-plugin-manager/{version('papermc_plugin_manager')}",
+            "User-Agent": f"papermc-plugin-manager/{pkg_version('papermc_plugin_manager')}",
         }
 
     def get_download_link(self, file: FileInfo) -> str:
         return Version.get(file.version_id).files[0].url
-        
+
     def get_file_info(self, id: str) -> FileInfo:
         return self._get_file_info_cached(id)
-    
+
     def query(self, name: str, mc_version: str | None = None, limit: int = 5) -> list[SearchResult]:
         return self._query_cached(name, mc_version, limit)
-    
+
     def get_project_info(self, id: str) -> ProjectInfo:
         return self._get_project_info_cached(id)
 
@@ -57,7 +57,7 @@ class Modrinth(ConnectorInterface):
             modrinth_project = Project.get(id)
         except HTTPError as e:
             raise PluginNotFoundException(f"Project with ID {id} not found on Modrinth.") from e
-        
+
         cb(f"Fetching team members info for project {modrinth_project.title} ({id})...")
         members = TeamMember.list_for_project(id)
         owner = "Unknown"
@@ -82,9 +82,9 @@ class Modrinth(ConnectorInterface):
             file_info = version_to_file_info(version)
             plugin_info.versions[file_info.version_id] = file_info
         return plugin_info
-    
+
     @lru_cache(maxsize=128)
-    def _query_cached(self, name: str, mc_version: Optional[str], limit: int) -> list[SearchResult]:
+    def _query_cached(self, name: str, mc_version: str | None, limit: int) -> list[SearchResult]:
         facets = []
         facets.append(["categories:paper"])
         facets.append(["project_type:plugin"])
@@ -103,13 +103,13 @@ class Modrinth(ConnectorInterface):
         try:
             version = Version.get(id)
             return version_to_file_info(version)
-        except HTTPError as e:
+        except HTTPError:
             pass
 
         try:
             version = Version.get_by_hash(id)
             return version_to_file_info(version)
-        except HTTPError as e:
+        except HTTPError:
             pass
 
         raise PluginNotFoundException(f"File with ID or hash {id} not found on Modrinth.")

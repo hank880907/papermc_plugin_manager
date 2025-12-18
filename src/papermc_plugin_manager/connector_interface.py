@@ -1,11 +1,9 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
-from semantic_version import Version
-from logzero import logger
-from typing import Generator, List, Tuple, Callable
 
-from .utils import default_feedback_cb
+from logzero import logger
+from semantic_version import Version
 
 
 def sanitize_version_name(version_name: str) -> str:
@@ -47,25 +45,26 @@ class ProjectInfo:
 
     def __str__(self) -> str:
         return f"{self.name} by {self.author} (ID: {self.project_id})"
-    
+
     @staticmethod
     def is_newer_than(info: FileInfo, other: FileInfo) -> bool:
         """Compare two FileInfo objects to determine if info is newer than other.
-        
+
         Args:
             info: The FileInfo to check if newer
             other: The FileInfo to compare against
-            
+
         Returns:
             bool: True if info is newer than other, False otherwise
         """
+
         try:
             info_version_str = sanitize_version_name(info.version_name)
             other_version_str = sanitize_version_name(other.version_name)
-            
+
             info_version = Version.coerce(info_version_str)
             other_version = Version.coerce(other_version_str)
-            
+
             return info_version > other_version
         except ValueError:
             # If version parsing fails, fall back to date comparison
@@ -75,9 +74,8 @@ class ProjectInfo:
     def get_latest_type(self, release_type: str = "release") -> FileInfo | None:
         latest_release = None
         for file_info in self.versions.values():
-            if file_info.version_type.lower() == release_type.lower():
-                if latest_release is None or self.is_newer_than(file_info, latest_release):
-                    latest_release = file_info
+            if file_info.version_type.lower() == release_type.lower() and (latest_release is None or self.is_newer_than(file_info, latest_release)):
+                latest_release = file_info
         return latest_release
 
     def get_latest(self) -> FileInfo | None:
@@ -86,12 +84,10 @@ class ProjectInfo:
             if latest is None or self.is_newer_than(file_info, latest):
                 latest = file_info
         return latest
-    
+
     def get_version(self, version: str) -> FileInfo | None:
         for file_info in self.versions.values():
-            if file_info.version_name == version:
-                return file_info
-            elif file_info.version_id == version:
+            if file_info.version_name == version or file_info.version_id == version:
                 return file_info
         return None
 
@@ -102,7 +98,7 @@ class SearchResult:
     author: str
     downloads: int
     description: str
-    
+
 
 class ConnectorInterface(ABC):
     @abstractmethod
@@ -111,7 +107,7 @@ class ConnectorInterface(ABC):
         pass
 
     @abstractmethod
-    def query(self, name: str, mc_version: str | None = None, limit: int = 5) -> List[SearchResult]:
+    def query(self, name: str, mc_version: str | None = None, limit: int = 5) -> list[SearchResult]:
         """Query information about a plugin by its name."""
         pass
 
