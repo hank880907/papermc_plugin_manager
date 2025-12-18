@@ -76,6 +76,7 @@ def show(
     version: Annotated[str | None, typer.Option("--version", "-v", help="Specific version to show details for.")] = None,
     list_version_limit: Annotated[int, typer.Option("--limit", "-l", help="Limit the number of versions displayed.", show_default=True)] = 5,
     snapshot: Annotated[bool, typer.Option(help="Include snapshot versions in the version list.", is_flag=True)] = True,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation prompts.", is_flag=True, show_default=True)] = False,
 ):
     """show plugin details"""
     pm = get_plugin_manager()
@@ -86,7 +87,7 @@ def show(
         console.print_error(f"Plugin '{name}' not found.")
         raise typer.Exit(code=1)
 
-    if not exact_match:
+    if not exact_match and not yes:
         typer.confirm(f"Did you mean plugin '{project.name}' (ID: {project.project_id})?", abort=True, default=True)
 
     current_version = project.current_version
@@ -148,10 +149,10 @@ def install(
     name: Annotated[str, typer.Argument(help="Name or ID of the plugin to install.", autocompletion=installed_plugin_names)],
     version: Annotated[str | None, typer.Option("--version", "-v", help="Specific version to install. If not specified, installs the latest compatible version.")] = None,
     snapshot: Annotated[bool, typer.Option(help="Allow installation of snapshot versions if no release version is found.", is_flag=True, show_default=True)] = False,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation prompts.", is_flag=True, show_default=True)] = False,
 ):
     """install or update a plugin"""
     from rich.progress import BarColumn, DownloadColumn, Progress, TimeRemainingColumn, TransferSpeedColumn
-
     from .utils import download_file
 
     pm = get_plugin_manager()
@@ -162,7 +163,7 @@ def install(
         console.print_error(f"Plugin '{name}' not found.")
         raise typer.Exit(code=1)
 
-    if not exact_match:
+    if not exact_match and not yes:
         typer.confirm(f"Did you mean plugin '{project.name}' (ID: {project.project_id})?", abort=True, default=False)
 
     if version:
@@ -220,11 +221,45 @@ def install(
     pm.db.save_installation_info(filename, version_info.sha1, Path(Path("plugins") / filename).stat().st_size)
     console.print(f"[green]✓[/green] [white]{project.name} installed![/white]")
 
+@app.command()
+def upgrade(
+    ctx: typer.Context,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation prompts.", is_flag=True, show_default=True)] = False,
+):
+    pm = get_plugin_manager()
+    projects, _ = pm.get_installations()
+
+    upgrade_summary = []
+    for project in projects:
+        new_version = project.is_out_dated()
+        if new_version:
+            upgrade_summary.append((project, new_version))
+    
+    # show summary
+    if not upgrade_summary:
+        console.print("All installed plugins are up to date.")
+        raise typer.Exit()
+    
+    console.print("The following plugins have updates available:")
+    for project, new_version in upgrade_summary:
+        console.print(f"- {project.name}: {project.current_version.version_name} -> {new_version.version_name}")
+
+    if not yes:
+        typer.confirm("Do you want to proceed with the upgrade?", abort=True, default=False)
+
+    try:
+        ctx.invoke(install, name=project.project_id, version=new_version.version_name)
+    except Exception as e:
+        console.print_error(f"Failed to upgrade plugin '{project.name}': {e}")
+    
+
+    
 
 @app.command()
 def remove(
     ctx: typer.Context,
     name: Annotated[str, typer.Argument(help="Name or ID of the plugin to remove.", autocompletion=installed_plugin_names)],
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation prompts.", is_flag=True, show_default=True)] = False,
 ):
     """remove an installed plugin"""
     pm = get_plugin_manager()
@@ -234,7 +269,9 @@ def remove(
         console.print_error(f"Plugin '{name}' not found among installed plugins.")
         raise typer.Exit(code=1)
 
-    typer.confirm(f"Are you sure you want to remove plugin '{project.name}' (ID: {project.project_id})?", abort=True, default=False)
+    if not yes:
+        typer.confirm(f"Are you sure you want to remove plugin '{project.name}' (ID: {project.project_id})?", abort=True, default=False)
+
     current_version = project.current_version
     if current_version is None:
         console.print_error(f"No installed version found for plugin '{project.name}'.")
@@ -259,7 +296,7 @@ def setup_app(
     ctx: typer.Context,
     default_source: Annotated[str, typer.Option("--source", "-s", help="Default Connector source to use.", show_default=True, autocompletion=list_connectors)] = "Modrinth",
     show_version: bool = typer.Option(None, "--version", help="Show the application version and exit.", is_eager=True),
-    verbose: Annotated[int, typer.Option("--verbose", "-v", count=True)] = 0
+    verbose: Annotated[int, typer.Option("--verbose", "-v", count=True)] = 0,
 ):
     setup_logging(verbose)
     game_version = get_papermc_version()

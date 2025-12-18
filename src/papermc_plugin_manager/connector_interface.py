@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Optional
 
 from logzero import logger
 from semantic_version import Version
@@ -90,6 +91,17 @@ class ProjectInfo:
             if file_info.version_name == version or file_info.version_id == version:
                 return file_info
         return None
+    
+    def is_out_dated(self) -> Optional[FileInfo]:
+        if not self.current_version:
+            return None
+        latest = self.get_latest_type(self.current_version.version_type)
+        if not latest:
+            return None
+        if latest.version_id != self.current_version.version_id:
+            return latest
+        return None
+
 
 @dataclass
 class SearchResult:

@@ -108,14 +108,6 @@ class PpmConsole(Console):
                 continue
 
             latest_upgradable = project.get_latest_type(file_info.version_type)
-
-            project_name = project.name
-            project_id = project.project_id
-            type_display = get_release_type_string(file_info.version_type)
-
-            compatibility_info = get_compatibility_info(game_version, file_info.game_versions)
-            version_display = f"{compatibility_info} {file_info.version_name}"
-
             # show update status.
             if latest_upgradable:
                 is_outdated = latest_upgradable.version_id != file_info.version_id
@@ -126,11 +118,14 @@ class PpmConsole(Console):
             else:
                 status_display = "[dim]? unknown[/dim]"
 
+            compatibility_info = get_compatibility_info(game_version, file_info.game_versions)
+            version_display = f"{compatibility_info} {file_info.version_name}"
+
             table.add_row(
-                project_id,
-                project_name,
+                project.project_id,
+                project.name,
                 version_display,
-                type_display,
+                get_release_type_string(file_info.version_type),
                 file_info.release_date.strftime("%Y-%m-%d"),
                 status_display,
             )
