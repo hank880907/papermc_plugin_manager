@@ -8,7 +8,7 @@ import contextlib
 import json
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, List, Callable
 
 import requests
 from pydantic import BaseModel, ConfigDict, Field
@@ -234,7 +234,7 @@ class Version(BaseModel):
         loaders: list[str] | None = None,
         game_versions: list[str] | None = None,
         featured: bool | None = None,
-    ) -> list["Version"]:
+    ) -> List["Version"]:
         """
         List all versions for a project with optional filters.
 
@@ -259,57 +259,7 @@ class Version(BaseModel):
             params["featured"] = str(featured).lower()
 
         data = ModrinthAPIConfig.api_get(f"/project/{project_id}/version", params=params)
-        return [cls(**version_data) for version_data in data]
-
-    def download_primary_file(self, dest_dir: str = "."):
-        """
-        Download the primary file of this version and verify its integrity.
-
-        Args:
-            dest_dir: Destination directory for the download
-
-        Yields:
-            tuple: (bytes_downloaded, total_size, chunk, filename) for each chunk
-
-        Raises:
-            ValueError: If no primary file is found or hash verification fails
-            requests.HTTPError: If the download fails
-        """
-        import os
-
-        from ..console import console
-        from ..utils import verify_file_hash
-
-        primary = self.primary_file
-        if not primary:
-            raise ValueError("No primary file found for this version")
-
-        filepath = os.path.join(dest_dir, primary.filename)
-        expected_sha1 = primary.hashes.sha1
-
-        response = requests.get(primary.url, headers=ModrinthAPIConfig.HEADERS, stream=True, timeout=120)
-        response.raise_for_status()
-
-        # Get total file size
-        total_size = int(response.headers.get("content-length", 0))
-        bytes_downloaded = 0
-
-        with open(filepath, "wb") as f:
-            for chunk in response.iter_content(chunk_size=1024 * 256):
-                if chunk:
-                    f.write(chunk)
-                    bytes_downloaded += len(chunk)
-                    yield (bytes_downloaded, total_size, chunk, primary.filename)
-
-        # Verify the downloaded file's SHA1 hash
-        if not verify_file_hash(filepath, expected_sha1):
-            # Remove corrupted file
-            with contextlib.suppress(Exception):
-                os.remove(filepath)
-            raise ValueError(f"Downloaded file failed SHA1 verification. Expected: {expected_sha1}")
-
-        console.print("[dim]✓ File integrity verified[/dim]")
-        return filepath
+        return [cls(**version_data) for version_data in data] # type: ignore
 
 
 # ============== Project Models ==============
@@ -395,7 +345,7 @@ class Project(BaseModel):
         return cls(**data)
 
     @classmethod
-    def get_multiple(cls, project_ids: list[str]) -> list["Project"]:
+    def get_multiple(cls, project_ids: list[str]) -> List["Project"]:
         """
         Get multiple projects by their IDs.
 
@@ -410,7 +360,7 @@ class Project(BaseModel):
         """
         params = {"ids": json.dumps(project_ids)}
         data = ModrinthAPIConfig.api_get("/projects", params=params)
-        return [cls(**project_data) for project_data in data]
+        return [cls(**project_data) for project_data in data]  # type: ignore
 
     def get_versions(
         self, loaders: list[str] | None = None, game_versions: list[str] | None = None, featured: bool | None = None
@@ -612,7 +562,7 @@ class TeamMember(BaseModel):
             requests.HTTPError: If the API request fails
         """
         data = ModrinthAPIConfig.api_get(f"/project/{project_id}/members")
-        return [cls(**member_data) for member_data in data]
+        return [cls(**member_data) for member_data in data] # type: ignore
 
     @property
     def is_owner(self) -> bool:

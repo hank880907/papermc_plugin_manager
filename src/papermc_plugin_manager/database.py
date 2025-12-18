@@ -2,7 +2,8 @@ from sqlalchemy import create_engine, String, Integer, Text, select, ForeignKey,
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session, relationship
 from sqlalchemy.types import JSON
 from sqlalchemy.ext.mutable import MutableList
-from typing import List
+from typing import List, Dict
+from datetime import datetime
 from logzero import logger
 
 from .connector_interface import ConnectorInterface, FileInfo, ProjectInfo
@@ -11,15 +12,33 @@ from .connector_interface import ConnectorInterface, FileInfo, ProjectInfo
 class Base(DeclarativeBase):
     pass
 
+class FileHashTable(Base):
+    __tablename__ = 'file_hash'
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    sha1: Mapped[str] = mapped_column(String, index=True)
+    hash_type: Mapped[str] = mapped_column(String, nullable=False)
+    hash_digest: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    
+    @classmethod
+    def from_hashes(cls, hashes: dict[str, str]) -> list["FileHashTable"]:
+        hash_tables = []
+        for hash_type, hash_digest in hashes.items():
+            hash_tables.append(FileHashTable(
+                sha1=hashes.get("sha1", ""),
+                hash_type=hash_type,
+                hash_digest=hash_digest,
+            ))
+        return hash_tables
+    
 
 class FileTable(Base):
     __tablename__ = 'file'
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    project_id: Mapped[str] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"))
+    project_id: Mapped[str] = mapped_column(String, index=True)
     version_id: Mapped[str] = mapped_column(String, index=True)
     version_name: Mapped[str] = mapped_column(String)
     version_type: Mapped[str] = mapped_column(String)
-    release_date: Mapped[DateTime] = mapped_column(DateTime)
+    release_date: Mapped[datetime] = mapped_column(DateTime)
     game_versions: Mapped[list[str]] = mapped_column(MutableList.as_mutable(JSON), default=list)
     url: Mapped[str] = mapped_column(String)
     description: Mapped[str] = mapped_column(Text)
@@ -40,6 +59,7 @@ class FileTable(Base):
         )
     
     def update(self, info: FileInfo):
+        self.project_id = info.project_id
         self.version_name = info.version_name
         self.version_type = info.version_type
         self.release_date = info.release_date
@@ -89,7 +109,7 @@ class ProjectTable(Base):
         self.description = info.description
         self.downloads = info.downloads
 
-    def to_project_info(self, info_list: List[FileTable]) -> ProjectInfo:
+    def to_project_info(self, info_list: List[FileTable], hashes: List[Dict[str, str]]) -> ProjectInfo:
         return ProjectInfo(
             source=self.source,
             project_id=self.project_id,
@@ -135,7 +155,7 @@ class SourceDatabase:
         with Session(self.engine) as session:
             stmt = select(FileTable).where(FileTable.project_id == project_id)
             files = session.execute(stmt).scalars().all()
-            return files
+            return list(files)
         
     def get_file_by_sha1(self, sha1: str) -> FileTable | None:
         with Session(self.engine) as session:
@@ -150,15 +170,28 @@ class SourceDatabase:
         project_table = self.get_project_table_by_id(file_table.project_id)
         if project_table is None:
             return None
-        files = self.get_all_files(project_table.project_id)
-        return project_table.to_project_info(files)
+        return self.get_project_info(project_table.project_id)
+    
+    def get_hashes_by_file_sha1(self, sha1: str) -> dict[str, str]:
+        stmt = select(FileHashTable).where(FileHashTable.sha1 == sha1)
+        with Session(self.engine) as session:
+            hash_tables = session.execute(stmt).scalars().all()
+            if not hash_tables:
+                return {}
+            file_hashes = {hash_table.hash_type: hash_table.hash_digest for hash_table in hash_tables}
+            return file_hashes
 
     def get_project_info(self, name: str) -> ProjectInfo | None:
         project_table = self.get_project_table(name)
         if project_table is None:
             return None
         files = self.get_all_files(project_table.project_id)
-        project_info = project_table.to_project_info(files)
+        hashes = []
+        for file in files:
+            file_hashes = self.get_hashes_by_file_sha1(file.sha1)
+            hashes.append(file_hashes)
+        
+        project_info = project_table.to_project_info(files, hashes)
         with Session(self.engine) as session:
             stmt = (
                 select(InstallationTable.sha1)
@@ -169,7 +202,12 @@ class SourceDatabase:
             )
             installation_sha1 = session.scalars(stmt).one_or_none()
             if installation_sha1:
-                project_info.current_version = self.get_file_by_sha1(installation_sha1).to_file_info()
+                installation = self.get_file_by_sha1(installation_sha1)
+                if installation:
+                    project_info.current_version = installation.to_file_info()
+                    project_info.current_version.hashes = self.get_hashes_by_file_sha1(installation_sha1)
+                else:
+                    logger.error(f"Installation with SHA1 {installation_sha1} not found in database.")
         return project_info
 
     def save_project_info(self, info: ProjectInfo):
@@ -194,6 +232,18 @@ class SourceDatabase:
                     session.add(file_table)
                 else:
                     file_table.update(file_info)
+                    
+                hash_tables = FileHashTable.from_hashes(file_info.hashes)
+                
+                for hash_table in hash_tables:
+                    stmt = select(FileHashTable).where(
+                        FileHashTable.sha1 == hash_table.sha1,
+                        FileHashTable.hash_type == hash_table.hash_type,
+                    )
+                    existing_hash = session.execute(stmt).scalar_one_or_none()
+                    if existing_hash is None:
+                        session.add(hash_table)
+            logger.debug(f"Saved project info for '{info.name}' into database.")
             session.commit()
 
     def save_installation_info(self, filename: str, sha1: str, filesize: int):
@@ -212,6 +262,15 @@ class SourceDatabase:
                 logger.debug(f"Updating installation filename from {installation.filename} to {filename}.")
                 installation.filename = filename
             session.commit()
+            
+    def remove_installation(self, filename: str):
+        with Session(self.engine) as session:
+            stmt = select(InstallationTable).where(InstallationTable.filename == filename)
+            installation = session.execute(stmt).scalar_one_or_none()
+            if installation:
+                logger.debug(f"Removing installation: {installation.filename} with SHA1: {installation.sha1}")
+                session.delete(installation)
+                session.commit()
 
     def remove_stale_installations(self, valid_sha1s: List[str]):
         with Session(self.engine) as session:
@@ -226,7 +285,7 @@ class SourceDatabase:
         with Session(self.engine) as session:
             stmt = select(InstallationTable)
             installations = session.execute(stmt).scalars().all()
-            return installations
+            return list(installations)
         
     def get_installation_by_sha1(self, sha1: str) -> InstallationTable | None:
         with Session(self.engine) as session:

@@ -1,91 +1,94 @@
 """Rich console utilities for the PaperMC Plugin Manager CLI."""
 
 from rich import box
-from rich.console import Console
+from rich.console import Console, Group
 from rich.panel import Panel
 from rich.table import Table
-from typing import List
+from rich.text import Text
+from typing import List, Optional, Dict, Tuple
 
-from .connector_interface import ProjectInfo, FileInfo
+from .connector_interface import ProjectInfo, FileInfo, SearchResult
 from .database import InstallationTable
 
-# Create a global console instance
+
+def get_key_value_table(data: List[Tuple[str, str]]) -> Table:
+    table = Table.grid(padding=(0, 3))
+    table.add_column(justify="left", style="cyan", no_wrap=True)
+    table.add_column(style="white", no_wrap=False)
+    for key, value in data:
+        table.add_row(key, value)
+    return table
 
 class PpmConsole(Console):
-    """Custom Rich Console for PaperMC Plugin Manager."""
 
     def __init__(self):
         super().__init__()
 
     def print_success(self, message: str):
-        """Print a success message."""
         self.print(f"[green]✓[/green] {message}")
 
 
     def print_error(self, message: str):
-        """Print an error message."""
         self.print(f"[red]✗[/red] {message}", style="red")
 
 
     def print_warning(self, message: str):
-        """Print a warning message."""
         self.print(f"[yellow]⚠[/yellow] {message}", style="yellow")
 
     def print_info(self, message: str):
-        """Print an info message."""
         self.print(f"[cyan]ℹ[/cyan] {message}")
 
-    def print_project_info_panel(
-        self,
-        info: ProjectInfo,
-        filename: str | None = None,
-        game_version: str | None = None,
-    ) -> Panel:
-        """Create a Rich Panel for displaying plugin information."""
+    def print_project_info_panel(self, info: ProjectInfo, filename: Optional[str] = None, game_version: Optional[str] = None):
+        
+        latest_version = info.get_latest()
+        latest_release_version = info.get_latest_type("release")
 
         name = info.name
         id = info.project_id
         author = info.author
         downloads = info.downloads
-        latest = info.get_latest().version_name if info.get_latest() else None
-        latest_release = info.get_latest_type("release").version_name if info.get_latest_type("release") else None
+        latest_version_name = latest_version.version_name if latest_version else None
+        latest_release_name = latest_release_version.version_name if latest_release_version else None
         description = info.description
 
-        # Create the content with aligned labels
-        content = []
-        content.append(f"[cyan]ID:[/cyan]              {id}")
-        content.append(f"[cyan]Author:[/cyan]          {author}")
-        content.append(f"[cyan]Downloads:[/cyan]       {downloads:,}")
-        content.append(f"[cyan]Latest:[/cyan]          {latest if latest else '[dim]N/A[/dim]'}")
-        content.append(f"[cyan]Latest Release:[/cyan]  {latest_release if latest_release else '[dim]N/A[/dim]'}")
+        elements = []
+        info_data = [
+            ("Name", name),
+            ("ID", id),
+            ("Author", author),
+            ("Downloads", f"{downloads:,}"),
+            ("Latest Version", latest_version_name if latest_version_name else "N/A"),
+            ("Latest Release", latest_release_name if latest_release_name else "N/A"),
+            ("Source", info.source),
+        ]
+        
+        elements.append(get_key_value_table(info_data))
 
-        content.append("")
+        elements.append(Text(""))
         if info.current_version:
-            content.append(f"[green]✓ Installed:[/green] {info.current_version.version_name} [dim]({filename})[/dim]")
-            content.append(get_compatibility_info(game_version, info.current_version.game_versions, full=True))
+            elements.append(Text.from_markup(f"[green]✓ Installed:[/green] {info.current_version.version_name} [dim]({filename})[/dim]"))
+            if game_version:
+                elements.append(Text.from_markup(get_compatibility_info(game_version, info.current_version.game_versions, full=True)))
         else:
-            content.append(f"[dim]Not installed[/dim]")
+            elements.append(Text.from_markup(f"[dim]Not installed[/dim]"))
 
         if description:
-            content.append("")
-            content.append("[yellow]Description:[/yellow]")
-            content.append(description)
+            elements.append(Text(""))
+            elements.append(Text.from_markup("[yellow]Description:[/yellow]"))
+            elements.append(Text(description))
 
         self.print(
             Panel(
-                "\n".join(content),
+                Group(*elements),
                 title=f"[bold green]{name}[/bold green]",
                 border_style="green",
                 box=box.ROUNDED,
-                title_align="left",
             )
         )
 
-    def print_installed_plugins_table(self, projects: List[ProjectInfo], game_version: str = None) -> Table:
-        """Create a Rich Table for displaying installed plugin status."""
-
+    def print_installed_plugins_table(self, projects: List[ProjectInfo], game_version: Optional[str] = None):
         table = Table(
-            title=f"[bold cyan]{len(projects)} Plugins Installed[/bold cyan]",
+            title=f"[bold cyan] Installed Plugins [/bold cyan]",
             box=box.ROUNDED,
             show_header=True,
             header_style="bold magenta",
@@ -98,34 +101,30 @@ class PpmConsole(Console):
         table.add_column("Date", style="dim")
         table.add_column("Status", style="white", justify="center")
 
-        # for _file_name, file_info, is_outdated, project_name, project_id, latest_version in plugins_data:
         for project in projects:
             # Style the version type
             file_info = project.current_version
             if file_info is None:
                 continue
-            latest = project.get_latest_type(file_info.version_type)
-            is_outdated = latest.version_id != file_info.version_id
+            
+            latest_upgradable = project.get_latest_type(file_info.version_type)
+            
             project_name = project.name
             project_id = project.project_id
-            latest_version = project.get_latest_type(file_info.version_type).version_name
-            version_type = file_info.version_type
-            if version_type == "RELEASE":
-                type_display = "[green]●[/green] RELEASE"
-            elif version_type == "BETA":
-                type_display = "[yellow]●[/yellow] BETA"
-            else:
-                type_display = "[red]●[/red] ALPHA"
+            type_display = get_release_type_string(file_info.version_type)
 
-            compatibility_icon = get_compatibility_info(game_version, file_info.game_versions)
-            # Add compatibility icon to version name
-            version_display = f"{compatibility_icon} {file_info.version_name}"
+            compatibility_info = get_compatibility_info(game_version, file_info.game_versions)
+            version_display = f"{compatibility_info} {file_info.version_name}"
 
-            # Status indicator - show latest version if outdated
-            if is_outdated and latest_version:
-                status_display = f"[yellow]⚠ {latest_version}[/yellow]"
+            # show update status.
+            if latest_upgradable:
+                is_outdated = latest_upgradable.version_id != file_info.version_id
+                if is_outdated and latest_upgradable.version_name:
+                    status_display = f"[yellow]⚠ {latest_upgradable.version_name}[/yellow]"
+                else:
+                    status_display = "[green]✓ up-to-date[/green]"
             else:
-                status_display = "[green]✓ up-to-date[/green]"
+                status_display = "[dim]? unknown[/dim]"
 
             table.add_row(
                 project_id,
@@ -137,8 +136,7 @@ class PpmConsole(Console):
             )
         self.print(table)
 
-    def print_unidentified_plugins_table(self, unidentified_data: List[InstallationTable]) -> Table:
-        """Create a Rich Table for displaying unidentified/unrecognized plugins."""
+    def print_unidentified_plugins_table(self, unidentified_data: List[InstallationTable]):
 
         table = Table(
             title="[bold yellow]Unidentified Plugins[/bold yellow]",
@@ -170,119 +168,104 @@ class PpmConsole(Console):
                 size_str,
             )
         self.print(table)
+        
+    def print_version_detail_panel(self, file_info: FileInfo, title: str = "Version Details"):
+        groups = []
+        
+        info = [("Version Name", file_info.version_name),
+                ("Project ID", file_info.project_id),
+                ("Version Type", get_release_type_string(file_info.version_type)),
+                ("Release Date", file_info.release_date.strftime("%Y-%m-%d %H:%M:%S")),
+                ("MC Versions", ", ".join(file_info.game_versions)),
+                ("Download URL", file_info.url)]
+        
+        groups.append(get_key_value_table(info))
+
+        if file_info.hashes:
+            groups.append(Text.from_markup(""))
+            groups.append(Text.from_markup("[yellow]Hashes:[/yellow]"))
+            for hash_type, hash_value in file_info.hashes.items():
+                groups.append(Text.from_markup(f"  {hash_type.upper()}: [dim]{hash_value[:16]}...[/dim]"))
+
+        if file_info.description:
+            groups.append(Text.from_markup(""))
+            groups.append(Text.from_markup("[yellow]Description:[/yellow]"))
+            groups.append(Text.from_markup(file_info.description))
+            
+        self.print(Panel(
+            Group(*groups),
+            title=f"[bold green]{title}[/bold green]",
+            border_style="green",
+            box=box.ROUNDED,
+        ))
+        
+    def print_version_table(self, versions_data: List[FileInfo], title: str = "Available Versions", game_version: Optional[str] = None):
+        table = Table(
+            title=f"[bold cyan]{title}[/bold cyan]",
+            box=box.ROUNDED,
+            show_header=True,
+            header_style="bold magenta",
+        )
+        table.add_column("ID", style="cyan", no_wrap=True)
+        table.add_column("Veresion")
+        table.add_column("Type", style="white")
+        table.add_column("Release Date", style="white")
+        table.add_column("PaperMC", style="dim")
+        for file_info in versions_data:
+            mc_versions = ", ".join(reversed(file_info.game_versions[-3:]))  # Show last 3 versions in reverse (newest first)
+            if len(file_info.game_versions) > 3:
+                mc_versions += f" +{len(file_info.game_versions) - 3} more"
+
+            type_style = get_release_type_string(file_info.version_type)
+            # Check compatibility with game version
+            compatibility_icon = get_compatibility_info(game_version, file_info.game_versions)
+            table.add_row(
+                file_info.version_id,
+                f"{compatibility_icon} {file_info.version_name}",
+                type_style,
+                file_info.release_date.strftime("%Y-%m-%d"),
+                mc_versions,
+            )
+        self.print(table)
+        
+    def print_search_results_table(self, results: List[SearchResult]):
+        """Create a Rich Table for displaying search results."""
+
+        table = Table(
+            title="[bold cyan]Search Results[/bold cyan]",
+            box=box.ROUNDED,
+            show_header=True,
+            header_style="bold magenta",
+            title_style="bold cyan",
+        )
+
+        table.add_column("ID", style="dim", width=10, justify="left")
+        table.add_column("Name", style="bold green", no_wrap=False)
+        table.add_column("Author", style="cyan")
+        table.add_column("Downloads", justify="right", style="yellow")
+        table.add_column("Description", no_wrap=False, style="white")
+
+        for result in results:
+            # Truncate description if too long
+            desc = result.description or ""
+
+            table.add_row(
+                result.project_id,
+                result.project_name,
+                result.author,
+                f"{result.downloads:,}",
+                desc,
+            )
+        self.print(table)
+
+
     
 console = PpmConsole()
 
 
-def create_search_results_table(results: dict) -> Table:
-    """Create a Rich Table for displaying search results."""
-
-    table = Table(
-        title="[bold cyan]Search Results[/bold cyan]",
-        box=box.ROUNDED,
-        show_header=True,
-        header_style="bold magenta",
-        title_style="bold cyan",
-    )
-
-    table.add_column("ID", style="dim", width=10, justify="left")
-    table.add_column("Name", style="bold green", no_wrap=False)
-    table.add_column("Author", style="cyan")
-    table.add_column("Downloads", justify="right", style="yellow")
-    table.add_column("Description", no_wrap=False, style="white")
-
-    for plugin_id, project in results.items():
-        # Truncate description if too long
-        desc = project.description or ""
-        if len(desc) > 60:
-            desc = desc[:57] + "..."
-
-        table.add_row(
-            plugin_id,
-            project.name,
-            project.author,
-            f"{project.downloads:,}",
-            desc,
-        )
-
-    return table
 
 
-def create_version_table(versions_data: list, title: str = "Available Versions", game_version: str = None) -> Table:
-    """Create a Rich Table for displaying version information."""
-
-    table = Table(
-        title=f"[bold cyan]{title}[/bold cyan]",
-        box=box.ROUNDED,
-        show_header=True,
-        header_style="bold magenta",
-    )
-
-    table.add_column("Version ID", style="cyan", no_wrap=True)
-    table.add_column("Name", style="bold green")
-    table.add_column("Type", style="white")
-    table.add_column("Release Date", style="white")
-    table.add_column("MC Versions", style="dim")
-
-    for version_id, file_info in versions_data:
-        # Format Minecraft versions (showing newest first)
-        mc_versions = ", ".join(reversed(file_info.mc_versions[-3:]))  # Show last 3 versions in reverse (newest first)
-        if len(file_info.mc_versions) > 3:
-            mc_versions += f" +{len(file_info.mc_versions) - 3} more"
-
-        # Style the version type
-        version_type = file_info.version_type
-        if version_type == "RELEASE":
-            type_style = "[green]●[/green] RELEASE"
-        elif version_type == "BETA":
-            type_style = "[yellow]●[/yellow] BETA"
-        else:
-            type_style = "[red]●[/red] ALPHA"
-
-        # Check compatibility with game version
-        compatibility_icon = get_compatibility_info(game_version, file_info.game_versions)
-
-        table.add_row(
-            version_id,
-            f"{compatibility_icon}{file_info.version_name}",
-            type_style,
-            file_info.release_date.strftime("%Y-%m-%d"),
-            mc_versions,
-        )
-
-    return table
-
-
-def create_version_detail_panel(version_id: str, file_info) -> Panel:
-    """Create a Rich Panel for displaying detailed version information."""
-
-    content = []
-    content.append(f"[cyan]Version ID:[/cyan]     {file_info.version_id}")
-    content.append(f"[cyan]Version Name:[/cyan]   {file_info.version_name}")
-    content.append(f"[cyan]Release Type:[/cyan]   {file_info.version_type}")
-    content.append(f"[cyan]Release Date:[/cyan]   {file_info.release_date.strftime('%Y-%m-%d %H:%M:%S')}")
-    content.append(f"[cyan]MC Versions:[/cyan]    {', '.join(file_info.mc_versions)}")
-    content.append(f"[cyan]Download URL:[/cyan]   {file_info.url}")
-
-    if file_info.hashes:
-        content.append("")
-        content.append("[yellow]Hashes:[/yellow]")
-        for hash_type, hash_value in file_info.hashes.items():
-            content.append(f"  {hash_type.upper()}: [dim]{hash_value}[/dim]")
-
-    if file_info.description:
-        content.append("")
-        content.append("[yellow]Description:[/yellow]")
-        content.append(file_info.description)
-
-    return Panel(
-        "\n".join(content),
-        title="[bold green]Version Details[/bold green]",
-        border_style="green",
-        box=box.ROUNDED,
-    )
-
-def compute_compatibility_score(current_version: str, supported_versions: List[str]) -> str:
+def compute_compatibility_score(supported_versions: List[str], current_version: Optional[str]) -> int:
     # Parse game version into parts
 
     if current_version and supported_versions:
@@ -304,8 +287,8 @@ def compute_compatibility_score(current_version: str, supported_versions: List[s
         return best_match
     return -1
 
-def get_compatibility_info(current_version: str, supported_versions: List[str], full: bool = False) -> str:
-    score = compute_compatibility_score(current_version, supported_versions)
+def get_compatibility_info(current_version: Optional[str], supported_versions: List[str], full: bool = False) -> str:
+    score = compute_compatibility_score(supported_versions, current_version)
     if full:
         if score == 3:
             return f"[green]✓ Compatible[/green] with server version [cyan]{current_version}[/cyan]"
@@ -325,9 +308,12 @@ def get_compatibility_info(current_version: str, supported_versions: List[str], 
         else:
             return "[dim]?[/dim]"
     
-
-
-
-
-
-
+def get_release_type_string(version_type: str) -> str:
+    if version_type == "RELEASE":
+        return "[green]●[/green] RELEASE"
+    elif version_type == "BETA":
+        return "[yellow]●[/yellow] BETA"
+    elif version_type == "ALPHA":
+        return "[red]●[/red] ALPHA"
+    else:
+        return f"[dim]●[/dim] {version_type}"

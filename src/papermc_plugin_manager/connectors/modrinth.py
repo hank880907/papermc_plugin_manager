@@ -1,13 +1,20 @@
 from functools import lru_cache
 from requests import HTTPError
+from importlib.metadata import version
+from typing import Callable, Optional
 
-from ..config import Config
-from ..connector_interface import ConnectorInterface, FileInfo, ProjectInfo
+
+from ..connector_interface import ConnectorInterface, FileInfo, ProjectInfo, SearchResult
 from ..exceptions import PluginNotFoundException
+from ..utils import default_feedback_cb
 from .modrinth_models import Project, SearchResponse, TeamMember, Version
 
 
 def version_to_file_info(version: Version) -> FileInfo:
+    hashes = {
+        "sha1": version.files[0].hashes.sha1,
+        "sha512": version.files[0].hashes.sha512,
+    }
     return FileInfo(
         project_id=version.project_id,
         version_id=version.id,
@@ -18,39 +25,40 @@ def version_to_file_info(version: Version) -> FileInfo:
         sha1=version.files[0].hashes.sha1,
         url=version.files[0].url,
         description=version.changelog or "",
+        hashes=hashes
     )
 
 
 class Modrinth(ConnectorInterface):
-    API_BASE = Config.MODRINTH_API_BASE
+    API_BASE = "https://api.modrinth.com/v2"
 
     @property
     def HEADERS(self):
         """Get headers with configurable User-Agent."""
         return {
-            "User-Agent": Config.get_user_agent(),
+            "User-Agent": f"papermc-plugin-manager/{version('papermc_plugin_manager')}",
         }
 
-    def download(self, file: FileInfo, dest: str):
-        """Download a file and yield progress information."""
-        yield from Version.get(file.version_id).download_primary_file(dest)
-
-    @lru_cache(maxsize=128)
-    def query(self, name: str, mc_version: str | None = None, limit: int = 5) -> dict[str, ProjectInfo]:
-        facets = []
-        facets.append(["categories:paper"])
-        facets.append(["project_type:plugin"])
-        if mc_version:
-            facets.append([f"versions:{mc_version}"])
-        response = SearchResponse.search(name, limit=limit, facets=facets)
-        results = {}
-        for hit in response.hits:
-            results[hit.project_id] = self.get_project_info(hit.project_id)
-        return results
-
-    @lru_cache(maxsize=128)
+    def get_download_link(self, file: FileInfo) -> str:
+        return Version.get(file.version_id).files[0].url
+        
+    def get_file_info(self, id: str) -> FileInfo:
+        return self._get_file_info_cached(id)
+    
+    def query(self, name: str, mc_version: str | None = None, limit: int = 5) -> list[SearchResult]:
+        return self._query_cached(name, mc_version, limit)
+    
     def get_project_info(self, id: str) -> ProjectInfo:
-        modrinth_project = Project.get(id)
+        return self._get_project_info_cached(id)
+
+    @lru_cache(maxsize=128)
+    def _get_project_info_cached(self, id: str, cb: Callable[[str], None] = default_feedback_cb) -> ProjectInfo:
+        try:
+            modrinth_project = Project.get(id)
+        except HTTPError as e:
+            raise PluginNotFoundException(f"Project with ID {id} not found on Modrinth.") from e
+        
+        cb(f"Fetching team members info for project {modrinth_project.title} ({id})...")
         members = TeamMember.list_for_project(id)
         owner = "Unknown"
         for member in members:
@@ -66,22 +74,32 @@ class Modrinth(ConnectorInterface):
             description=modrinth_project.description,
             downloads=modrinth_project.downloads,
         )
+        cb(f"Fetching versions info for project {modrinth_project.title} ({id})...")
         versions = Version.list_for_project(id, loaders=["paper"])
         if not versions:
             return plugin_info
-        plugin_info.latest = versions[0].id
-        for version in versions:
-            if version.version_type == "release":
-                plugin_info.latest_release = version.id
-                break
         for version in versions:
             file_info = version_to_file_info(version)
             plugin_info.versions[file_info.version_id] = file_info
         return plugin_info
+    
+    @lru_cache(maxsize=128)
+    def _query_cached(self, name: str, mc_version: Optional[str], limit: int) -> list[SearchResult]:
+        facets = []
+        facets.append(["categories:paper"])
+        facets.append(["project_type:plugin"])
+        if mc_version:
+            facets.append([f"versions:{mc_version}"])
+        response = SearchResponse.search(name, limit=limit, facets=facets)
+        results = []
+        for hit in response.hits:
+            result = SearchResult(hit.project_id, hit.title, hit.author, hit.downloads, hit.description)
+            results.append(result)
+        return results
+
 
     @lru_cache(maxsize=128)
-    def get_file_info(self, id: str) -> FileInfo:
-        """Get detailed information about a file by its ID."""
+    def _get_file_info_cached(self, id: str) -> FileInfo:
         try:
             version = Version.get(id)
             return version_to_file_info(version)

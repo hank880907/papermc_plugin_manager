@@ -3,8 +3,9 @@ import json
 import os
 from pathlib import Path
 from logzero import logger
+from typing import Optional
+import requests
 
-from .config import Config
 
 def compute_md5(file_path):
     m = hashlib.md5()
@@ -17,9 +18,9 @@ def compute_md5(file_path):
     return m.hexdigest()
 
 
-def compute_sha1(path: str | Path, chunk_size: int = None) -> str:
+def compute_sha1(path: str | Path, chunk_size: Optional[int] = None) -> str:
     if chunk_size is None:
-        chunk_size = Config.DOWNLOAD_CHUNK_SIZE
+        chunk_size = 1024 * 1024
     h = hashlib.new("sha1")
     p = Path(path)
     with p.open("rb") as f:
@@ -34,7 +35,7 @@ def get_papermc_version():
     Returns:
         str: The current PaperMC version, or None if not found.
     """
-    version_history_path = Config.VERSION_HISTORY_FILE
+    version_history_path = "version_history.json"
     if not os.path.exists(version_history_path):
         return None
     try:
@@ -67,3 +68,21 @@ def verify_file_hash(file_path: Path | str, expected_sha1: str) -> bool:
         logger.error(f"Expected: {expected_sha1}, Got: {actual_sha1}")
 
     return is_valid
+
+
+def default_feedback_cb(msg: str):
+    logger.debug(msg)
+    return
+
+
+def download_file(url: str, dest: str):
+    response = requests.get(url, stream=True, timeout=120)
+    response.raise_for_status()
+    total_size = int(response.headers.get("content-length", 0))
+    bytes_downloaded = 0
+    with open(dest, "wb") as f:
+        for chunk in response.iter_content(chunk_size=1024 * 8):
+            if chunk:
+                f.write(chunk)
+                bytes_downloaded += len(chunk)
+                yield (bytes_downloaded, total_size)

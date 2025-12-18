@@ -3,6 +3,18 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from semantic_version import Version
 from logzero import logger
+from typing import Generator, List, Tuple, Callable
+
+from .utils import default_feedback_cb
+
+
+def sanitize_version_name(version_name: str) -> str:
+    """sometimes version name could be prefixed with non-numeric charactors. This function removes it."""
+    for c in version_name:
+        if c.isdigit():
+            index = version_name.index(c)
+            return version_name[index:]
+    return version_name
 
 
 @dataclass
@@ -16,6 +28,7 @@ class FileInfo:
     sha1: str
     url: str
     description: str = ""
+    hashes: dict[str, str] = field(default_factory=dict)
 
     def __str__(self) -> str:
         return f"{self.version_name} ({self.version_type}) - Released on {self.release_date.strftime('%Y-%m-%d')}"
@@ -47,9 +60,8 @@ class ProjectInfo:
             bool: True if info is newer than other, False otherwise
         """
         try:
-            # Strip 'v' prefix if present before parsing
-            info_version_str = info.version_name.lstrip('v') if info.version_name.lower().startswith('v') else info.version_name
-            other_version_str = other.version_name.lstrip('v') if other.version_name.lower().startswith('v') else other.version_name
+            info_version_str = sanitize_version_name(info.version_name)
+            other_version_str = sanitize_version_name(other.version_name)
             
             info_version = Version.coerce(info_version_str)
             other_version = Version.coerce(other_version_str)
@@ -57,7 +69,7 @@ class ProjectInfo:
             return info_version > other_version
         except ValueError:
             # If version parsing fails, fall back to date comparison
-            logger.warning(f"Version parsing failed for '{info.version_name}' or '{other.version_name}'. Falling back to date comparison.")
+            logger.debug(f"Version parsing failed for '{info.version_name}' or '{other.version_name}'. Falling back to date comparison.")
             return info.release_date > other.release_date
 
     def get_latest_type(self, release_type: str = "release") -> FileInfo | None:
@@ -75,19 +87,31 @@ class ProjectInfo:
                 latest = file_info
         return latest
     
+    def get_version(self, version: str) -> FileInfo | None:
+        for file_info in self.versions.values():
+            if file_info.version_name == version:
+                return file_info
+            elif file_info.version_id == version:
+                return file_info
+        return None
+
+@dataclass
+class SearchResult:
+    project_id: str
+    project_name: str
+    author: str
+    downloads: int
+    description: str
+    
 
 class ConnectorInterface(ABC):
     @abstractmethod
-    def download(self, file: FileInfo, dest: str):
-        """Download a file from the given id to the specified destination.
-
-        Yields:
-            tuple: (bytes_downloaded, total_size, chunk, filename) for each chunk downloaded
-        """
+    def get_download_link(self, file: FileInfo) -> str:
+        """Get a download link for a given file"""
         pass
 
     @abstractmethod
-    def query(self, name: str, mc_version: str | None = None, limit: int = 5) -> dict[str, ProjectInfo]:
+    def query(self, name: str, mc_version: str | None = None, limit: int = 5) -> List[SearchResult]:
         """Query information about a plugin by its name."""
         pass
 
