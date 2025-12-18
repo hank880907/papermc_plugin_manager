@@ -1,5 +1,10 @@
 {
-  "cSpell.words": ["logzero", "Modrinth", "papermc"],
+  "cSpell.words": [
+    "inspectable",
+    "logzero",
+    "Modrinth",
+    "papermc"
+  ],
   "python.testing.pytestArgs": ["tests"],
   "python.testing.unittestEnabled": false,
   "python.testing.pytestEnabled": true

@@ -1,14 +1,26 @@
 # PaperMC Plugin Manager (ppm)
 
-A modern, user-friendly command-line tool for managing PaperMC server plugins. Built with Python and featuring intelligent caching, automatic updates, and beautiful console output powered by Rich.
+A standalone CLI tool for inspecting and managing plugins on a PaperMC server using Modrinth metadata.
+This project was written to solve the pain of manually tracking plugins on Linux servers accessed via SSH.
+It is intended for server owners who want visibility and safe, controlled updates — not automatic plugin upgrades.
 
 ## Features
 
-- **Search**: Search for plugins across Modrinth with fuzzy matching
-- **Easy Installation**: Install plugins with a single command
-- **Version Management**: Upgrade, downgrade, or switch between specific versions
-- **Version Detection**: Automatically detects outdated plugins
 - **Installation Status**: See which plugins are installed at a glance
+- **Search**: Search for plugins across Modrinth with fuzzy matching
+- **Version Management**: Upgrade, downgrade, or switch between specific versions
+- **Plugin Detection**: Automatically detects plugins
+
+## Why This Exists
+
+Many existing plugin managers suffer from one or more of the following problems:
+
+- downloading the wrong plugin due to name collisions
+- upgrading to a wrong version
+- requiring accounts, Discord bots, or license servers
+- running inside the Minecraft server itself
+
+This project aims to avoid those pitfalls by being explicit, inspectable, and boring in the right ways.
 
 ## Screenshots
 
@@ -38,7 +50,7 @@ uv tool install papermc-plugin-manager
 - List installed plugins:
 
 ```bash
-ppm update
+ppm update # This will fetch plugin info from remote.
 ppm list
 ```
 
@@ -58,11 +70,11 @@ ppm show <plugin-name-or-id> [--version <version>]
 
 ```bash
 # Latest release
-ppm install <plugin-name> [-y]
+ppm install <plugin-name>
 
 # Specific version
-ppm install <plugin-name> --version <version> [-y]
+ppm install <plugin-name> --version <version>
 
 # Latest snapshot/beta
-ppm install <plugin-name> --snapshot [-y]
+ppm install <plugin-name> --snapshot
 ```
