@@ -219,6 +219,40 @@ def install(
     pm.db.save_project_info(project)
     pm.db.save_installation_info(filename, version_info.sha1, Path(Path("plugins") / filename).stat().st_size)
     console.print(f"[green]✓[/green] [white]{project.name} installed![/white]")
+    
+    
+@app.command()
+def remove(
+    ctx: typer.Context,
+    name: Annotated[str, typer.Argument(help="Name or ID of the plugin to remove.", autocompletion=installed_plugin_names)],
+):
+    """remove an installed plugin"""
+    pm = get_plugin_manager()
+    context: CliContext = ctx.obj
+
+    project = pm.get_project_info(name)
+    if not project:
+        console.print_error(f"Plugin '{name}' not found among installed plugins.")
+        raise typer.Exit(code=1)
+    
+    typer.confirm(f"Are you sure you want to remove plugin '{project.name}' (ID: {project.project_id})?", abort=True, default=False)
+    current_version = project.current_version
+    if current_version is None:
+        console.print_error(f"No installed version found for plugin '{project.name}'.")
+        raise typer.Exit(code=1)
+    
+    installation = pm.db.get_installation_by_sha1(current_version.sha1)
+    if installation is None:
+        console.print_error(f"No installation record found for plugin '{project.name}'.")
+        raise typer.Exit(code=1)
+    plugin_path = Path("plugins") / installation.filename
+    if plugin_path.exists():
+        console.print(f"Removing plugin file '{installation.filename}'...")
+        plugin_path.unlink()
+        
+    pm.db.remove_installation(installation.filename)
+    console.print(f"[green]✓[/green] [white]{project.name} removed![/white]")
+    
 
 
 @app.callback(invoke_without_command=True)

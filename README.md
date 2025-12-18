@@ -4,12 +4,11 @@ A modern, user-friendly command-line tool for managing PaperMC server plugins. B
 
 ## Features
 
-- 🔍 **Smart Search**: Search for plugins across Modrinth with fuzzy matching
-- 📦 **Easy Installation**: Install plugins with a single command
-- ⬇️ **Version Management**: Upgrade, downgrade, or switch between specific versions
-- 💾 **Intelligent Caching**: Fast operations with apt-like cache system
-- 🔄 **Version Detection**: Automatically detects outdated plugins
-- 📋 **Installation Status**: See which plugins are installed at a glance
+- **Search**: Search for plugins across Modrinth with fuzzy matching
+- **Easy Installation**: Install plugins with a single command
+- **Version Management**: Upgrade, downgrade, or switch between specific versions
+- **Version Detection**: Automatically detects outdated plugins
+- **Installation Status**: See which plugins are installed at a glance
 
 ## Screenshots
 
@@ -32,4 +31,38 @@ Or using uv:
 
 ```bash
 uv tool install papermc-plugin-manager
+```
+
+## Usage
+
+- List installed plugins:
+
+```bash
+ppm update
+ppm list
+```
+
+- Search for plugins:
+
+```bash
+ppm search <plugin-name>
+```
+
+- Show plugin details:
+
+```bash
+ppm show <plugin-name-or-id> [--version <version>]
+```
+
+- Install plugins:
+
+```bash
+# Latest release
+ppm install <plugin-name> [-y]
+
+# Specific version
+ppm install <plugin-name> --version <version> [-y]
+
+# Latest snapshot/beta
+ppm install <plugin-name> --snapshot [-y]
 ```
