@@ -219,8 +219,7 @@ class SourceDatabase:
 
             for file_info in info.versions.values():
                 stmt = select(FileTable).where(
-                    FileTable.project_id == info.project_id,
-                    FileTable.version_id == file_info.version_id
+                    FileTable.sha1 == file_info.sha1
                 )
                 file_table = session.execute(stmt).scalar_one_or_none()
                 if file_table is None:
