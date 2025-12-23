@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from importlib.metadata import version
 from pathlib import Path
 from typing import Annotated, Tuple, List
+import datetime
 
 import logzero
 import typer
@@ -272,8 +273,6 @@ def upgrade(
             console.print_error(f"Failed to upgrade plugin '{project.name}': {e}")
     
 
-
-
 @app.command()
 def remove(
     ctx: typer.Context,
@@ -310,15 +309,34 @@ def remove(
 
 
 @app.command()
-def clean():
+def clean(
+    ctx: typer.Context,
+    snapshot: Annotated[bool, typer.Option("--snapshot", "-s", help="Remove all snapshots.", is_flag=True, show_default=True)] = False,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation prompts.", is_flag=True, show_default=True)] = False,
+):
     """Remove cached database"""
     from .config import Config
     db_path = Path(Config.DB_PATH)
-    if db_path.exists():
-        db_path.unlink()
-        console.print(f"[green]✓[/green] [white]Database cleaned.[/white]")
-    else:
+    if not db_path.exists():
         console.print("[yellow]⚠[/yellow] [white]No database found to clean.[/white]")
+        raise typer.Exit()
+    
+    if snapshot:
+        pm = get_plugin_manager()
+        snapshots = pm.db.get_all_snapshots()
+        if not snapshots:
+            console.print("[yellow]⚠[/yellow] [white]No snapshots found to clean.[/white]")
+            raise typer.Exit()
+        for s in snapshots:
+            pm.db.delete_snapshot(s.id)
+        console.print(f"[green]✓[/green] [white]All snapshots cleaned.[/white]")
+        raise typer.Exit()
+
+    if not yes:
+        typer.confirm(f"Are you sure you want to delete the database at '{db_path}'?", abort=True, default=False)
+    db_path.unlink()
+    console.print(f"[green]✓[/green] [white]Database cleaned.[/white]")
+
 
 @app.command()
 def track(
@@ -348,6 +366,109 @@ def track(
     sha1 = pm.db.get_installed_project_sha1(project.project_id)
     pm.db.update_installation_type(sha1, project.installation_type)
     console.print(f"[green]✓[/green] [white]Plugin '{project.name}' is now tracking [cyan]{project.installation_type}[/cyan] versions.[/white]")
+
+
+@app.command()
+def snapshot(
+    ctx: typer.Context,
+    name: Annotated[str, typer.Argument(help="Name of the plugins snapshot.")] = datetime.datetime.now().strftime("snapshot_%Y%m%d_%H%M%S"),
+    description: Annotated[str , typer.Option("--description", "-d", help="Description for the snapshot.")] = "",
+):
+    """Create a snapshot of installed plugins"""
+    pm = get_plugin_manager()
+    cli_ctx: CliContext = ctx.obj
+    filenames = pm.get_installed_plugins_filename()
+    if not filenames:
+        console.print_warning("No installed plugins found to snapshot.")
+        raise typer.Exit()
+    
+    snapshot_table = pm.db.create_snapshot(name, description, cli_ctx.game_version)
+    for filepath in filenames:
+        with open(filepath, "rb") as f:
+            blob = f.read()
+        pm.db.add_file_to_snapshot(snapshot_table.id, Path(filepath).name, blob)
+    console.print(f"[green]✓[/green] [white]Snapshot '{name}' created with {len(filenames)} plugins.[/white]")
+
+@app.command()
+def snapshots(
+    ctx: typer.Context,
+):
+    """List available snapshots"""
+    pm = get_plugin_manager()
+    snapshot_tables = pm.db.get_all_snapshots()
+    if not snapshot_tables:
+        console.print_warning("No snapshots found.")
+        raise typer.Exit()
+    
+    from rich.table import Table
+    table = Table(show_header=True, header_style="bold magenta")
+    table.add_column("Snapshot Name", style="dim", width=30)
+    table.add_column("Description", style="dim", width=50)
+    table.add_column("Created At", style="dim", width=20)
+    table.add_column("Plugins Count", style="dim", width=15)
+    for snapshot in snapshot_tables:
+        plugins = pm.db.get_snapshot_files(snapshot.id)
+        table.add_row(snapshot.name, snapshot.description, snapshot.create_time.strftime("%Y-%m-%d %H:%M:%S"), str(len(plugins)))
+    console.print(table)
+
+def get_snapshot_names() -> list[str]:
+    logzero.loglevel(logzero.logging.CRITICAL)
+    pm = get_plugin_manager()
+    snapshots = pm.db.get_all_snapshots()
+    return [snapshot.name for snapshot in snapshots]
+
+@app.command()
+def restore(
+    ctx: typer.Context,
+    name: Annotated[str, typer.Argument(help="Name of the snapshot to restore.", autocompletion=get_snapshot_names)],
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation prompts.", is_flag=True, show_default=True)] = False,
+):
+    """Restore a snapshot of installed plugins"""
+    pm = get_plugin_manager()
+    snapshot = pm.db.get_snapshot_by_name(name)
+    if not snapshot:
+        console.print_error(f"Snapshot '{name}' not found.")
+        raise typer.Exit(code=1)
+    
+    files = pm.db.get_snapshot_files(snapshot.id)
+    if not files:
+        console.print_warning(f"No files found in snapshot '{name}'.")
+        raise typer.Exit()
+    
+    if not yes:
+        typer.confirm(f"Are you sure you want to restore snapshot '{name}' with {len(files)} plugins? This will overwrite existing plugins.", abort=True, default=False)
+
+    # remove existing plugins
+    existing_plugins = pm.get_installed_plugins_filename()
+    for filepath in existing_plugins:
+        console.print(f"Removing existing plugin file '{filepath}'...")
+        Path(filepath).unlink()
+    
+    for file in files:
+        plugin_path = Path("plugins") / file.filename
+        with open(plugin_path, "wb") as f:
+            f.write(file.blob)
+    console.print(f"[green]✓[/green] [white]Snapshot '{name}' restored with {len(files)} plugins.[/white]")
+    console.print("Run [green]ppm update[/green] to refresh the plugin database.")
+
+@app.command()
+def remove_snapshot(
+    ctx: typer.Context,
+    name: Annotated[str, typer.Argument(help="Name of the snapshot to remove.", autocompletion=get_snapshot_names)],
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation prompts.", is_flag=True, show_default=True)] = False,
+):
+    """Remove a snapshot"""
+    pm = get_plugin_manager()
+    snapshot = pm.db.get_snapshot_by_name(name)
+    if not snapshot:
+        console.print_error(f"Snapshot '{name}' not found.")
+        raise typer.Exit(code=1)
+    
+    if not yes:
+        typer.confirm(f"Are you sure you want to remove snapshot '{name}'?", abort=True, default=False)
+
+    pm.db.delete_snapshot(snapshot.id)
+    console.print(f"[green]✓[/green] [white]Snapshot '{name}' removed.[/white]")
 
 
 @app.callback(invoke_without_command=True)

@@ -39,7 +39,7 @@ class PluginManager:
                 return True
         return False
 
-    def update(self, feedback_cb: Callable[[str], None] = default_feedback_cb):
+    def remove_stale_installations(self):
         # get the installed plugins and their hashes.
         plugins = self.get_installed_plugins_filename()
         plugin_hashes = []
@@ -51,6 +51,9 @@ class PluginManager:
             plugin_hashes.append(sha1)
         # remove stale installations
         self.db.remove_stale_installations(plugin_hashes)
+
+    def update(self, feedback_cb: Callable[[str], None] = default_feedback_cb):
+        self.remove_stale_installations()
         # fetch installation info
         installations = self.db.get_all_installations()
         for installation in installations:
@@ -79,6 +82,7 @@ class PluginManager:
                 logger.warning(f"Plugin with SHA1 {installation.sha1} not found on {connector.__class__.__name__}: {e}")
 
     def get_installations(self) -> tuple[list[ProjectInfo], list[InstallationTable]]:
+        self.remove_stale_installations()
         installations = self.db.get_all_installations()
         projects = []
         unrecognized = []

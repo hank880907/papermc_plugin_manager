@@ -1,15 +1,34 @@
 from datetime import datetime
 from logzero import logger
-from sqlalchemy import DateTime, Integer, String, Text, create_engine, select
+from sqlalchemy import DateTime, Integer, String, Text, create_engine, select, ForeignKey, LargeBinary
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 from sqlalchemy.types import JSON
+from typing import Optional
 
 from .connector_interface import FileInfo, ProjectInfo
 from .config import Config
 
 class Base(DeclarativeBase):
     pass
+
+class SnapshotInfoTable(Base):
+    __tablename__ = 'snapshot_info'
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String, unique=True, index=True)
+    create_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    description: Mapped[str] = mapped_column(Text)
+    game_version: Mapped[str] = mapped_column(String, nullable=True)
+
+
+class SnapshotFileTable(Base):
+    __tablename__ = 'snapshot_file'
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    snapshot_id: Mapped[int] = mapped_column(ForeignKey('snapshot_info.id'), nullable=False, onupdate="CASCADE")
+    filename: Mapped[str] = mapped_column(String, nullable=False)
+    blob: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    
+
 
 class FileHashTable(Base):
     __tablename__ = 'file_hash'
@@ -318,3 +337,62 @@ class SourceDatabase:
             if installation:
                 installation.installation_type = installation_type
                 session.commit()
+
+    def create_snapshot(self, name: str, description: str = "", game_version: Optional[str] = None) -> SnapshotInfoTable:
+        with Session(self.engine) as session:
+            snapshot = SnapshotInfoTable(
+                name=name,
+                description=description,
+                game_version=game_version,
+            )
+            session.add(snapshot)
+            session.commit()
+            logger.debug(f"Created snapshot '{name}' with ID {snapshot.id}.")
+            return snapshot
+        
+    def add_file_to_snapshot(self, snapshot_id: int, filename: str, blob: bytes) -> SnapshotFileTable:
+        with Session(self.engine) as session:
+            snapshot_file = SnapshotFileTable(
+                snapshot_id=snapshot_id,
+                filename=filename,
+                blob=blob,
+            )
+            session.add(snapshot_file)
+            session.commit()
+            logger.debug(f"Added file '{filename}' to snapshot ID {snapshot_id}.")
+            return snapshot_file
+
+    def get_all_snapshots(self) -> list[SnapshotInfoTable]:
+        with Session(self.engine) as session:
+            stmt = select(SnapshotInfoTable)
+            snapshots = session.execute(stmt).scalars().all()
+            return list(snapshots)
+        
+    def get_snapshot_files(self, snapshot_id: int) -> list[SnapshotFileTable]:
+        with Session(self.engine) as session:
+            stmt = select(SnapshotFileTable).where(SnapshotFileTable.snapshot_id == snapshot_id)
+            files = session.execute(stmt).scalars().all()
+            return list(files)
+        
+    def get_snapshot_by_name(self, name: str) -> SnapshotInfoTable | None:
+        with Session(self.engine) as session:
+            stmt = select(SnapshotInfoTable).where(SnapshotInfoTable.name == name)
+            return session.execute(stmt).scalar_one_or_none()
+        
+    def get_snapshot_names(self) -> list[str]:
+        with Session(self.engine) as session:
+            stmt = select(SnapshotInfoTable.name)
+            names = session.execute(stmt).scalars().all()
+            return list(names)
+        
+    def delete_snapshot(self, snapshot_id: int):
+        with Session(self.engine) as session:
+            snapshot = session.get(SnapshotInfoTable, snapshot_id)
+            if snapshot:
+                logger.debug(f"Deleting snapshot '{snapshot.name}' with ID {snapshot.id}.")
+                session.delete(snapshot)
+            files = self.get_snapshot_files(snapshot_id)
+            for file in files:
+                logger.debug(f"Deleting snapshot file '{file.filename}' from snapshot ID {snapshot_id}.")
+                session.delete(file)
+            session.commit()
