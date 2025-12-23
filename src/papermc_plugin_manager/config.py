@@ -6,3 +6,4 @@ class Config:
 
     # Default settings
     DEFAULT_SOURCE: str = "not_set"
+    DB_PATH: str = "ppm.db"

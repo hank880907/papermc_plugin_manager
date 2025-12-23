@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from importlib.metadata import version
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Tuple, List
 
 import logzero
 import typer
@@ -10,6 +10,7 @@ from .console import console
 from .logging import setup_logging
 from .plugin_manager import get_plugin_manager, list_connectors
 from .utils import get_papermc_version
+from .connector_interface import FileInfo, ProjectInfo
 
 app = typer.Typer(
     help="PaperMC Plugin Manager - Manage plugins for your PaperMC server.",
@@ -171,22 +172,28 @@ def install(
         if version_info is None:
             console.print_error(f"Version '{version}' not found for plugin '{project.name}'.")
             raise typer.Exit(code=1)
+        project.installation_type = version_info.version_type
+
     elif project.current_version:
-        current = project.current_version
-        latest = project.get_latest_type(current.version_type)
+        track = project.installation_type
+        latest = project.get_latest_type_weighted(track)
         if latest and project.current_version.version_id != latest.version_id:
-            console.print(f"Updating plugin {project.name} from version {current.version_name} to {latest.version_name}...")
+            console.print(f"Updating plugin {project.name} from version {project.current_version.version_name} to {latest.version_name}...")
             version_info = latest
         else:
-            console.print(f"Plugin '{project.name}' is already up to date (version {current.version_name}).")
+            console.print(f"Plugin '{project.name}' is already up to date (version {project.current_version.version_name}).")
             raise typer.Exit()
-    elif snapshot:
-        version_info = project.get_latest()
     else:
-        version_info = project.get_latest_type("release")
-        if version_info is None:
-            console.print_warning(f"No release version found for plugin '{project.name}'. Using latest version...")
+        release = project.get_latest_type("release")
+        if not snapshot and release is not None:
+            version_info = release
+        else:
             version_info = project.get_latest()
+            if not snapshot:
+                console.print_warning(f"No release version found for plugin '{project.name}'. Using latest version...")
+        project.installation_type = version_info.version_type
+
+    console.print_info(f"{project.name} is tracking {project.installation_type} versions.")
 
     if version_info is None:
         console.print_error(f"No suitable version found for plugin '{project.name}'.")
@@ -218,7 +225,7 @@ def install(
                 task = progress.add_task(f"[cyan]Downloading {filename}...", total=total_size)
             progress.update(task, completed=bytes_downloaded)
     pm.db.save_project_info(project)
-    pm.db.save_installation_info(filename, version_info.sha1, Path(Path("plugins") / filename).stat().st_size)
+    pm.db.save_installation_info(filename, version_info.sha1, Path(Path("plugins") / filename).stat().st_size, project.installation_type)
     console.print(f"[green]✓[/green] [white]{project.name} installed![/white]")
 
 @app.command()
@@ -226,10 +233,11 @@ def upgrade(
     ctx: typer.Context,
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation prompts.", is_flag=True, show_default=True)] = False,
 ):
+    from rich.table import Table
     pm = get_plugin_manager()
     projects, _ = pm.get_installations()
 
-    upgrade_summary = []
+    upgrade_summary: List[Tuple[ProjectInfo, FileInfo]] = []
     for project in projects:
         new_version = project.is_out_dated()
         if new_version:
@@ -241,8 +249,14 @@ def upgrade(
         raise typer.Exit()
     
     console.print("The following plugins have updates available:")
+    table = Table(show_header=True, header_style="bold magenta")
+    table.add_column("Plugin Name", style="dim", width=30)
+    table.add_column("Current Version", style="dim", width=20)
+    table.add_column("New Version", style="dim", width=20)
     for project, new_version in upgrade_summary:
-        console.print(f"- {project.name}: {project.current_version.version_name} -> {new_version.version_name}")
+        current_version = project.current_version.version_name if project.current_version else "N/A"
+        table.add_row(project.name, current_version, new_version.version_name)
+    console.print(table)
 
     if not yes:
         typer.confirm("Do you want to proceed with the upgrade?", abort=True, default=False)
@@ -254,7 +268,7 @@ def upgrade(
             console.print_error(f"Failed to upgrade plugin '{project.name}': {e}")
     
 
-    
+
 
 @app.command()
 def remove(
@@ -291,6 +305,46 @@ def remove(
     console.print(f"[green]✓[/green] [white]{project.name} removed![/white]")
 
 
+@app.command()
+def clean():
+    """Remove cached database"""
+    from .config import Config
+    db_path = Path(Config.DB_PATH)
+    if db_path.exists():
+        db_path.unlink()
+        console.print(f"[green]✓[/green] [white]Database cleaned.[/white]")
+    else:
+        console.print("[yellow]⚠[/yellow] [white]No database found to clean.[/white]")
+
+@app.command()
+def track(
+    ctx: typer.Context,
+    name: Annotated[str, typer.Argument(help="Name or ID of the plugin to set tracking for.", autocompletion=installed_plugin_names)],
+    track: Annotated[str, typer.Argument(help="Tracking type: RELEASE, BETA, ALPHA", autocompletion=lambda: ["RELEASE", "BETA", "ALPHA"])] = None,
+):
+    """Check or set the tracking type for an installed plugin"""
+
+    pm = get_plugin_manager()
+    project = pm.get_project_info(name)
+    if not project:
+        console.print_error(f"Plugin '{name}' not found among installed plugins.")
+        raise typer.Exit(code=1)
+
+    if track is None:
+        console.print_info(f"Plugin '{project.name}' is currently tracking [cyan]{project.installation_type}[/cyan] versions.")
+        raise typer.Exit()
+
+    valid_tracks = ["RELEASE", "BETA", "ALPHA"]
+    if track.upper() not in valid_tracks:
+        console.print_error(f"Invalid tracking type '{track}'. Valid options are: {', '.join(valid_tracks)}.")
+        raise typer.Exit(code=1)
+
+    project.installation_type = track.upper()
+    project.current_version
+    sha1 = pm.db.get_installed_project_sha1(project.project_id)
+    pm.db.update_installation_type(sha1, project.installation_type)
+    console.print(f"[green]✓[/green] [white]Plugin '{project.name}' is now tracking [cyan]{project.installation_type}[/cyan] versions.[/white]")
+
 
 @app.callback(invoke_without_command=True)
 def setup_app(
@@ -317,6 +371,7 @@ def setup_app(
         app_version = version("papermc_plugin_manager")
         console.print(f"[cyan]PaperMC Plugin Manager[/cyan] [green]v{app_version}[/green]")
         raise typer.Exit()
+
 
 
 def main():

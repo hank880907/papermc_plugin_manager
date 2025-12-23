@@ -33,6 +33,14 @@ class FileInfo:
         return f"{self.version_name} ({self.version_type}) - Released on {self.release_date.strftime('%Y-%m-%d')}"
 
 
+def release_type_weights(release_type: str) -> int:
+    weights = {
+        "release": 3,
+        "beta": 2,
+        "alpha": 1
+    }
+    return weights.get(release_type.lower(), 0)
+
 @dataclass
 class ProjectInfo:
     source: str
@@ -43,6 +51,7 @@ class ProjectInfo:
     downloads: int
     versions: dict[str, FileInfo] = field(default_factory=dict)
     current_version: FileInfo | None = None
+    installation_type: str = "RELEASE"
 
     def __str__(self) -> str:
         return f"{self.name} by {self.author} (ID: {self.project_id})"
@@ -79,6 +88,15 @@ class ProjectInfo:
                 latest_release = file_info
         return latest_release
 
+    def get_latest_type_weighted(self, min_release_type: str) -> FileInfo | None:
+        latest = None
+        min_weight = release_type_weights(min_release_type)
+        for file_info in self.versions.values():
+            if release_type_weights(file_info.version_type) >= min_weight:
+                if latest is None or self.is_newer_than(file_info, latest):
+                    latest = file_info
+        return latest
+
     def get_latest(self) -> FileInfo | None:
         latest = None
         for file_info in self.versions.values():
@@ -95,7 +113,7 @@ class ProjectInfo:
     def is_out_dated(self) -> Optional[FileInfo]:
         if not self.current_version:
             return None
-        latest = self.get_latest_type(self.current_version.version_type)
+        latest = self.get_latest_type_weighted(self.installation_type)
         if not latest:
             return None
         if latest.version_id != self.current_version.version_id:

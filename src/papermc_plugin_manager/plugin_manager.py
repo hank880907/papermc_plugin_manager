@@ -47,7 +47,7 @@ class PluginManager:
             sha1 = compute_sha1(plugin)
             filesize = Path(plugin).stat().st_size
             logger.debug(f"Plugin: {plugin}, SHA1: {sha1}")
-            self.db.save_installation_info(os.path.basename(plugin), sha1, filesize)
+            self.db.save_installation_info(os.path.basename(plugin), sha1, filesize, "UNKNOWN")
             plugin_hashes.append(sha1)
         # remove stale installations
         self.db.remove_stale_installations(plugin_hashes)
@@ -69,6 +69,8 @@ class PluginManager:
                     logger.debug(f"Plugin with SHA1 {installation.sha1} not found on {connector.__class__.__name__}: {e}")
                     continue
             logger.info(f"Plugin: {installation.filename}, Version: {fileinfo.version_name}, Released: {fileinfo.release_date}")
+            if installation.installation_type == "UNKNOWN":
+                self.db.update_installation_type(installation.sha1, fileinfo.version_type)
             try:
                 feedback_cb(f"Fetching project info for {installation.filename} from {connector.__class__.__name__}")
                 project_info = connector.get_project_info(fileinfo.project_id)

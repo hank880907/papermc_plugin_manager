@@ -98,8 +98,9 @@ class PpmConsole(Console):
         table.add_column("Plugin", style="bold green")
         table.add_column("Version", style="cyan")
         table.add_column("Type", style="white")
+        table.add_column("Track", style="cyan")
         table.add_column("Date", style="dim")
-        table.add_column("Status", style="white", justify="center")
+        table.add_column("Updates", style="white", justify="center")
 
         for project in projects:
             # Style the version type
@@ -107,16 +108,11 @@ class PpmConsole(Console):
             if file_info is None:
                 continue
 
-            latest_upgradable = project.get_latest_type(file_info.version_type)
-            # show update status.
-            if latest_upgradable:
-                is_outdated = latest_upgradable.version_id != file_info.version_id
-                if is_outdated and latest_upgradable.version_name:
-                    status_display = f"[yellow]⚠ {latest_upgradable.version_name}[/yellow]"
-                else:
-                    status_display = "[green]✓ up-to-date[/green]"
+            new_version = project.is_out_dated()
+            if new_version:
+                status_display = f"[yellow]⚠ {new_version.version_name}[/yellow]"
             else:
-                status_display = "[dim]? unknown[/dim]"
+                status_display = "[green]✓ up-to-date[/green]"
 
             compatibility_info = get_compatibility_info(game_version, file_info.game_versions)
             version_display = f"{compatibility_info} {file_info.version_name}"
@@ -126,6 +122,7 @@ class PpmConsole(Console):
                 project.name,
                 version_display,
                 get_release_type_string(file_info.version_type),
+                project.installation_type,
                 file_info.release_date.strftime("%Y-%m-%d"),
                 status_display,
             )

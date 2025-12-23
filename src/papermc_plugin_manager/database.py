@@ -1,5 +1,4 @@
 from datetime import datetime
-
 from logzero import logger
 from sqlalchemy import DateTime, Integer, String, Text, create_engine, select
 from sqlalchemy.ext.mutable import MutableList
@@ -7,7 +6,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 from sqlalchemy.types import JSON
 
 from .connector_interface import FileInfo, ProjectInfo
-
+from .config import Config
 
 class Base(DeclarativeBase):
     pass
@@ -126,10 +125,11 @@ class InstallationTable(Base):
     filename: Mapped[str] = mapped_column(String, nullable=False)
     sha1: Mapped[str] = mapped_column(String, nullable=False, index=True, unique=True)
     filesize: Mapped[int] = mapped_column(Integer, nullable=False)
+    installation_type: Mapped[str] = mapped_column(String, nullable=False, default="RELEASE")
 
 class SourceDatabase:
 
-    def __init__(self, db_url: str = "sqlite:///ppm.db"):
+    def __init__(self, db_url: str = f"sqlite:///{Config.DB_PATH}"):
         self.engine = create_engine(db_url, echo=False)
         Base.metadata.create_all(self.engine)
 
@@ -198,13 +198,30 @@ class SourceDatabase:
             )
             installation_sha1 = session.scalars(stmt).one_or_none()
             if installation_sha1:
-                installation = self.get_file_by_sha1(installation_sha1)
-                if installation:
-                    project_info.current_version = installation.to_file_info()
+                installed_file = self.get_file_by_sha1(installation_sha1)
+                if installed_file:
+                    project_info.current_version = installed_file.to_file_info()
                     project_info.current_version.hashes = self.get_hashes_by_file_sha1(installation_sha1)
                 else:
                     logger.error(f"Installation with SHA1 {installation_sha1} not found in database.")
+                installation = self.get_installation_by_sha1(installation_sha1)
+                if installation:
+                    project_info.installation_type = installation.installation_type
         return project_info
+    
+    def get_installed_project_sha1(self, project_name: str) -> str | None:
+        project_table = self.get_project_table(project_name)
+        if project_table is None:
+            return None
+        with Session(self.engine) as session:
+            stmt = (
+                select(InstallationTable.sha1)
+                .join(FileTable, InstallationTable.sha1 == FileTable.sha1)
+                .where(
+                    FileTable.project_id == project_table.project_id,
+                ).distinct()
+            )
+            return session.scalars(stmt).one_or_none()
 
     def save_project_info(self, info: ProjectInfo):
         with Session(self.engine) as session:
@@ -241,7 +258,7 @@ class SourceDatabase:
             logger.debug(f"Saved project info for '{info.name}' into database.")
             session.commit()
 
-    def save_installation_info(self, filename: str, sha1: str, filesize: int):
+    def save_installation_info(self, filename: str, sha1: str, filesize: int, installation_type: str = "RELEASE"):
         with Session(self.engine) as session:
             stmt = select(InstallationTable).where(InstallationTable.sha1 == sha1)
             installation = session.execute(stmt).scalar_one_or_none()
@@ -251,6 +268,7 @@ class SourceDatabase:
                     filename=filename,
                     sha1=sha1,
                     filesize=filesize,
+                    installation_type=installation_type,
                 )
                 session.add(installation)
             elif installation.filename != filename:
@@ -292,3 +310,11 @@ class SourceDatabase:
             stmt = select(InstallationTable).where(InstallationTable.sha1 == sha1)
             installation = session.execute(stmt).scalar_one_or_none()
             return installation is not None
+        
+    def update_installation_type(self, sha1: str, installation_type: str):
+        with Session(self.engine) as session:
+            stmt = select(InstallationTable).where(InstallationTable.sha1 == sha1)
+            installation = session.execute(stmt).scalar_one_or_none()
+            if installation:
+                installation.installation_type = installation_type
+                session.commit()
