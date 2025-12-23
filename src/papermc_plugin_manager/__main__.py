@@ -151,6 +151,7 @@ def install(
     version: Annotated[str | None, typer.Option("--version", "-v", help="Specific version to install. If not specified, installs the latest compatible version.")] = None,
     snapshot: Annotated[bool, typer.Option(help="Allow installation of snapshot versions if no release version is found.", is_flag=True, show_default=True)] = False,
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation prompts.", is_flag=True, show_default=True)] = False,
+    no_change_track: Annotated[bool, typer.Option(help="Do not change the track release type to the installed version's type.", is_flag=True, show_default=True)] = False,
 ):
     """install or update a plugin"""
     from rich.progress import BarColumn, DownloadColumn, Progress, TimeRemainingColumn, TransferSpeedColumn
@@ -172,7 +173,8 @@ def install(
         if version_info is None:
             console.print_error(f"Version '{version}' not found for plugin '{project.name}'.")
             raise typer.Exit(code=1)
-        project.installation_type = version_info.version_type
+        if not no_change_track:
+            project.installation_type = version_info.version_type
 
     elif project.current_version:
         track = project.installation_type
@@ -191,7 +193,9 @@ def install(
             version_info = project.get_latest()
             if not snapshot:
                 console.print_warning(f"No release version found for plugin '{project.name}'. Using latest version...")
-        project.installation_type = version_info.version_type
+        # set installation type only on first install
+        if project.current_version is None:
+            project.installation_type = version_info.version_type
 
     console.print_info(f"{project.name} is tracking {project.installation_type} versions.")
 
@@ -263,7 +267,7 @@ def upgrade(
 
     for project, new_version in upgrade_summary:
         try:
-            ctx.invoke(install, ctx, name=project.project_id, version=new_version.version_name)
+            ctx.invoke(install, ctx, name=project.project_id, version=new_version.version_name, no_change_track=True)
         except Exception as e:
             console.print_error(f"Failed to upgrade plugin '{project.name}': {e}")
     
