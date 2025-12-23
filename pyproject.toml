@@ -1,6 +1,6 @@
 [project]
 name = "papermc-plugin-manager"
-version = "0.1.1"
+version = "0.1.2.dev1"
 description = "A modern CLI tool for managing PaperMC server plugins"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -24,10 +24,7 @@ requires = ["uv_build>=0.9.18,<0.10.0"]
 build-backend = "uv_build"
 
 [dependency-groups]
-dev = [
-    "pytest>=9.0.2",
-    "ruff>=0.8.4",
-]
+dev = ["pytest>=9.0.2", "ruff>=0.8.4"]
 
 [tool.ruff]
 # Set the target Python version
@@ -38,40 +35,34 @@ line-length = 120
 
 # Enable specific rule sets
 lint.select = [
-    "E",    # pycodestyle errors
-    "W",    # pycodestyle warnings
-    "F",    # pyflakes
-    "I",    # isort
-    "N",    # pep8-naming
-    "UP",   # pyupgrade
-    "B",    # flake8-bugbear
-    "C4",   # flake8-comprehensions
-    "SIM",  # flake8-simplify
-    "RET",  # flake8-return
-    "PTH",  # flake8-use-pathlib
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+    "RET", # flake8-return
+    "PTH", # flake8-use-pathlib
 ]
 
 # Ignore specific rules that may be too strict
 lint.ignore = [
-    "E501",    # line too long (handled by formatter)
-    "B008",    # do not perform function calls in argument defaults
-    "PTH123",  # open() should be replaced by Path.open()
-    "B019",    # lru_cache on methods can lead to memory leaks (acceptable for connectors)
-    "B904",    # raise ... from err or from None (stylistic choice)
-    "N802",    # function name should be lowercase (HEADERS is conventional for HTTP headers)
-    "N818",    # exception names should end with Error (PPMException is clear enough)
-    "F403",    # star imports (used intentionally in __init__)
-    "PTH",     # pathlib conversions (will be done gradually)
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function calls in argument defaults
+    "PTH123", # open() should be replaced by Path.open()
+    "B019",   # lru_cache on methods can lead to memory leaks (acceptable for connectors)
+    "B904",   # raise ... from err or from None (stylistic choice)
+    "N802",   # function name should be lowercase (HEADERS is conventional for HTTP headers)
+    "N818",   # exception names should end with Error (PPMException is clear enough)
+    "F403",   # star imports (used intentionally in __init__)
+    "PTH",    # pathlib conversions (will be done gradually)
 ]
 
 # Exclude directories
-exclude = [
-    ".git",
-    ".venv",
-    "__pycache__",
-    "*.egg-info",
-    ".pytest_cache",
-]
+exclude = [".git", ".venv", "__pycache__", "*.egg-info", ".pytest_cache"]
 
 # Format configuration
 format.quote-style = "double"
