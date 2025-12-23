@@ -175,7 +175,7 @@ wheels = [
 
 [[package]]
 name = "papermc-plugin-manager"
-version = "0.1.2.dev1"
+version = "0.1.2.dev2"
 source = { editable = "." }
 dependencies = [
     { name = "colorama" },
